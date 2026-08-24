@@ -34,6 +34,8 @@ Na první záložce bude možné:
 
 Data zatím nebudou trvale uložena. Po obnovení stránky se počítadlo vrátí do výchozího stavu. Perzistenci doplníme později pomocí Capacitoru.
 
+![Výsledná podoba aplikace CounterApp v CV02](counter_app_cv02.png)
+
 ## 2. Kontrola prostředí
 
 ### Windows – PowerShell
