@@ -34,7 +34,11 @@ Na první záložce bude možné:
 
 Data zatím nebudou trvale uložena. Po obnovení stránky se počítadlo vrátí do výchozího stavu. Perzistenci doplníme později pomocí Capacitoru.
 
-![Výsledná podoba aplikace CounterApp v CV02](counter_app_cv02.png)
+<img
+  src="counter_app_cv02.png"
+  alt="Výsledná podoba aplikace CounterApp v CV02"
+  width="50%"
+>
 
 ## 2. Kontrola prostředí
 
