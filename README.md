@@ -16,9 +16,9 @@ Soubor `.nvmrc` v kořeni repozitáře určuje Node.js 26. Pokud používáte `n
 
 | Cvičení | Téma |
 | --- | --- |
-| [CV1](cv1/README.md) | Příprava vývojového prostředí a první Ionic aplikace |
-| [CV2](cv2/README.md) | CounterApp: záložky, Angular datové vazby a Ionic komponenty |
-| [CV3](cv3/README.md) | Znovupoužitelná komponenta a komunikace mezi komponentami |
+| [CV1](cv01/README.md) | Příprava vývojového prostředí a první Ionic aplikace |
+| [CV2](cv02/README.md) | CounterApp: záložky, Angular datové vazby a Ionic komponenty |
+| [CV3](cv03/README.md) | Znovupoužitelná komponenta a komunikace mezi komponentami |
 | CV4 | Bude doplněno |
 | CV5 | Bude doplněno |
 | CV6 | Bude doplněno |
