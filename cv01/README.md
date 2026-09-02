@@ -8,7 +8,8 @@ Po dokončení cvičení budete umět:
 - vytvořit nový projekt Ionic s frameworkem Angular a runtime Capacitor,
 - orientovat se v základní struktuře projektu,
 - spustit aplikaci ve webovém prohlížeči,
-- provést jednoduchou změnu a ověřit automatické obnovení aplikace.
+- provést jednoduchou změnu a ověřit automatické obnovení aplikace,
+- nastavit základní kontrolu kvality kódu pomocí ESLintu a Prettieru.
 
 V tomto cvičení ještě nebudeme sestavovat nativní Android ani iOS aplikaci. Android Studio a Xcode budete potřebovat v dalších cvičeních.
 
@@ -192,7 +193,7 @@ Zkontrolujte, že projekt obsahuje:
 
 Pokud se vytvořily jiné hlavní verze, nepokračujte v jejich ručním přepisování a informujte vyučujícího. Výstup příkazů přiložte ke svému dotazu.
 
-Referenční kontrola návodu byla provedena s Angular 22.0.1, Ionic 9.0.0 a Capacitor 8.5.0. Menší rozdíl v opravé nebo vedlejší verzi je v pořádku; jiná hlavní verze není.
+Referenční kontrola návodu byla provedena s Angular 22.0.1, Ionic 9.0.0 a Capacitor 8.5.0. Menší rozdíl v opravné nebo vedlejší verzi je v pořádku; jiná hlavní verze není.
 
 ## 7. Spuštění aplikace v prohlížeči
 
@@ -239,7 +240,113 @@ Soubor uložte. Běžící aplikace se má v prohlížeči automaticky aktualizo
 
 V nástrojích pro vývojáře prohlížeče zapněte simulaci mobilního zařízení a vyzkoušejte několik velikostí displeje. Jde pouze o simulaci rozměrů prohlížeče, nikoliv o plnohodnotný Android nebo iOS emulátor.
 
-## 9. Co budeme později dělat pro Android
+## 9. Lint a formátování projektu
+
+Od prvního cvičení budeme v projektu rozlišovat dvě kontroly:
+
+- **lint** hledá problematický TypeScript, Angular šablony a porušení pravidel projektu,
+- **formátování** sjednocuje zápis kódu, odsazení, uvozovky a zalamování.
+
+Lint řeší hlavně kvalitu a chyby. Prettier řeší vzhled kódu. Tyto nástroje se doplňují; jeden nenahrazuje druhý.
+
+### Kontrola ESLintu
+
+Nově vytvořený Ionic/Angular projekt již obsahuje ESLint. Ověřte, že v `package.json` existuje skript:
+
+```json
+"lint": "ng lint"
+```
+
+Spusťte kontrolu:
+
+```bash
+npm run lint
+```
+
+Pokud příkaz vypíše chybu, opravte ji dříve, než budete pokračovat. Část chyb lze opravit automaticky:
+
+```bash
+npx ng lint --fix
+```
+
+Automatická oprava není náhrada za přečtení změn. Po jejím spuštění zkontrolujte, co se v souborech změnilo.
+
+### Instalace Prettieru
+
+V kořenovém adresáři projektu nainstalujte Prettier jako vývojovou závislost:
+
+```bash
+npm install --save-dev prettier
+```
+
+Vytvořte soubor `.prettierrc.json`:
+
+```json
+{
+  "singleQuote": true,
+  "printWidth": 100,
+  "tabWidth": 2,
+  "semi": true
+}
+```
+
+Vytvořte soubor `.prettierignore`:
+
+```text
+node_modules
+www
+dist
+coverage
+.angular
+android
+ios
+package-lock.json
+```
+
+Tyto soubory můžete zkopírovat také z adresáře [`podklady`](podklady).
+
+### Skripty v package.json
+
+Do části `scripts` v souboru `package.json` doplňte:
+
+```json
+"format": "prettier --write \"src/**/*.{ts,html,scss}\" \"*.{json,js,ts,md}\"",
+"format:check": "prettier --check \"src/**/*.{ts,html,scss}\" \"*.{json,js,ts,md}\"",
+"check": "npm run lint && npm run format:check && npm run build"
+```
+
+Výsledná část `scripts` může vypadat například takto:
+
+```json
+"scripts": {
+  "ng": "ng",
+  "start": "ng serve",
+  "build": "ng build",
+  "watch": "ng build --watch --configuration development",
+  "test": "ng test",
+  "lint": "ng lint",
+  "format": "prettier --write \"src/**/*.{ts,html,scss}\" \"*.{json,js,ts,md}\"",
+  "format:check": "prettier --check \"src/**/*.{ts,html,scss}\" \"*.{json,js,ts,md}\"",
+  "check": "npm run lint && npm run format:check && npm run build"
+}
+```
+
+Pozor na čárky mezi položkami v JSONu. Za poslední položkou čárka být nesmí.
+
+### Použití během práce
+
+Před odevzdáním nebo před commitem spusťte:
+
+```bash
+npm run format
+npm run check
+```
+
+`npm run format` může změnit více souborů najednou. Je to v pořádku, ale změny si vždy prohlédněte. V týmovém projektu se domluvte, že formátování nebudete míchat s velkou funkční změnou ve stejném commitu.
+
+Ve VS Code si nastavte Prettier jako výchozí formatter a zapněte formátování při uložení. Editor potom bude formátovat průběžně, ale rozhodující jsou stále npm skripty v projektu, protože fungují stejně všem členům týmu i v CI.
+
+## 10. Co budeme později dělat pro Android
 
 Následující postup dnes není povinným úkolem. Slouží jako přehled dalších kroků:
 
@@ -258,7 +365,7 @@ ionic build
 npx cap sync android
 ```
 
-## 10. Co budeme později dělat pro iOS
+## 11. Co budeme později dělat pro iOS
 
 Tento postup lze provést pouze na macOS s Xcode:
 
@@ -272,7 +379,7 @@ npx cap open ios
 
 Nativní projekt se otevře v Xcode, kde lze vybrat simulátor nebo připojené zařízení.
 
-## 11. Kontrolní seznam CV1
+## 12. Kontrolní seznam CV1
 
 Na konci cvičení musí platit:
 
@@ -283,9 +390,12 @@ Na konci cvičení musí platit:
 - [ ] Projekt používá Ionic a Capacitor.
 - [ ] Aplikace běží na `http://localhost:8100`.
 - [ ] Upravil/a jsem text domovské stránky a změna se zobrazila v prohlížeči.
+- [ ] Spustil/a jsem `npm run lint`.
+- [ ] Přidal/a jsem Prettier a skripty `format`, `format:check` a `check`.
+- [ ] Před odevzdáním funguje `npm run check`.
 - [ ] Umím vývojový server ukončit pomocí `Ctrl+C`.
 
-## 12. Nejčastější problémy
+## 13. Nejčastější problémy
 
 ### `ionic: command not found`
 
@@ -314,6 +424,21 @@ Nemažte `package-lock.json`.
 ### `npm audit` hlásí zranitelnosti
 
 Hlašení si poznamenejte a oznamte vyučujícímu. Bez jeho pokynu nespouštějte `npm audit fix --force`: tento příkaz může změnit hlavní verze závislostí a projekt rozbít. Pro splnění CV1 je rozhodující, že se referenční aplikace sestaví a spustí v prohlížeči.
+
+### `npm run format:check` hlásí neformátované soubory
+
+Spusťte:
+
+```bash
+npm run format
+npm run format:check
+```
+
+Pokud druhý příkaz stále hlásí chybu, zkontrolujte, zda máte správně vytvořený soubor `.prettierignore` a zda příkaz spouštíte v kořenovém adresáři projektu.
+
+### `npm run check` skončí chybou
+
+Příkaz `check` spouští lint, kontrolu formátování a sestavení. Čtěte první chybu ve výstupu terminálu; další chyby mohou být jen důsledkem té první. Po opravě spusťte `npm run check` znovu.
 
 ### Bílá stránka nebo chyba v prohlížeči
 
