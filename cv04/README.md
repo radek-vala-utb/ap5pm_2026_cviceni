@@ -555,11 +555,10 @@ Pracovní strom má být čistý a nejnovější commit má obsahovat řešení 
 Po dokončení povinné části můžete:
 
 1. zobrazit součet hodnot všech uložených počítadel,
-2. přidat řazení historie podle času, názvu nebo hodnoty,
+2. přidat řazení historie podle názvu nebo hodnoty,
 3. přidat vyhledávání podle názvu,
 4. před smazáním celé historie zobrazit `ion-alert`,
 5. po úspěšném uložení nebo odstranění zobrazit `ion-toast`,
-6. zobrazit tlačítko pro export historie jako JSON do konzole.
 
 Potvrzovací dialog a toast budou podrobněji využity v některém z následujících cvičení. Bonusové řešení proto držte oddělené od služby pro ukládání dat.
 
