@@ -504,18 +504,258 @@ Preferences vrací `string | null` a uložený text nemusí vždy obsahovat oče
 
 Kontrola `Array.isArray()` zatím neověřuje jednotlivé vlastnosti každého objektu. Úplná validace cizích dat bude důležitější při komunikaci se vzdáleným API.
 
-## 13. Produkční sestavení
+## 13. Samostatná práce – testy CounterService
+
+`CounterService` obsahuje stav i pravidla pro jeho ukládání. Je proto vhodné testovat ji samostatně, bez spouštění stránek a bez zápisu do skutečného úložiště prohlížeče.
+
+Vaším úkolem je doplnit testy do souboru vytvořeného generátorem:
+
+```text
+src/app/services/counter.service.spec.ts
+```
+
+### Co mají testy ověřit
+
+Šablona v následující části již obsahuje test prvního spuštění bez dat a opakované inicializace. Tento test nemusíte vytvářet. Samostatně implementujte pouze následující scénáře:
+
+1. **Načtení uložených dat** – JSON obsahující pole `SavedCounter` se po `initialize()` objeví v `counters()`.
+2. **Přidání záznamu** – `add()` vloží nový záznam na začátek a zavolá `Preferences.set()` se správným klíčem a JSON hodnotou.
+3. **Odstranění jednoho záznamu** – `remove(id)` odstraní pouze odpovídající objekt a nový stav uloží.
+4. **Vymazání historie** – `clear()` vyprázdní signal a zavolá `Preferences.remove()` pouze pro klíč `saved-counters`.
+5. **Poškozená uložená hodnota** – neplatný JSON nezpůsobí pád testu; služba nastaví prázdnou historii, dokončí inicializaci a zapíše chybu do konzole.
+
+Netestujte přímo privátní metody `load()` a `persist()`. Ověřujte jejich výsledek přes veřejné metody služby a veřejné signály. Test pak zůstane platný, i když se později změní vnitřní implementace.
+
+### Proč je potřeba mock
+
+Jednotkový test nemá zapisovat do skutečného Preferences nebo `localStorage`. Modul `@capacitor/preferences` proto nahradíme mockem – malou řízenou náhradou, u které lze nastavit návratové hodnoty a kontrolovat volání.
+
+Použijte následující základ testovacího souboru a doplňte jednotlivé bloky `it(...)` sami:
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { Preferences } from '@capacitor/preferences';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SavedCounter } from '../models/saved-counter';
+import { CounterService } from './counter.service';
+
+vi.mock('@capacitor/preferences', () => ({
+  Preferences: {
+    get: vi.fn(),
+    set: vi.fn(),
+    remove: vi.fn(),
+  },
+}));
+
+describe('CounterService', () => {
+  let service: CounterService;
+
+  const getMock = vi.mocked(Preferences.get);
+  const setMock = vi.mocked(Preferences.set);
+  const removeMock = vi.mocked(Preferences.remove);
+
+  const first: SavedCounter = {
+    id: 'first',
+    name: 'První',
+    value: 1,
+    createdAt: '2026-09-17T08:00:00.000Z',
+  };
+
+  const second: SavedCounter = {
+    id: 'second',
+    name: 'Druhé',
+    value: 2,
+    createdAt: '2026-09-17T09:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    // Vynulujeme počty volání mocků z předchozího testu.
+    vi.clearAllMocks();
+
+    // Výchozí stav: v Preferences zatím není uložená historie.
+    getMock.mockResolvedValue({ value: null });
+
+    // Zápis i odstranění ve výchozím stavu úspěšně skončí.
+    setMock.mockResolvedValue(undefined);
+    removeMock.mockResolvedValue(undefined);
+
+    // Pro každý test vytvoříme nové prostředí Angular dependency injection.
+    TestBed.configureTestingModule({
+      providers: [CounterService],
+    });
+
+    // Z testovacího injectoru získáme čerstvou instanci služby.
+    service = TestBed.inject(CounterService);
+  });
+
+  it('should initialize only once', async () => {
+    // Dvě volání bez čekání simulují souběžné požadavky na inicializaci.
+    await Promise.all([service.initialize(), service.initialize()]);
+
+    // Další volání proběhne až po dokončení první inicializace.
+    await service.initialize();
+
+    // Všechna volání musí sdílet jedinou operaci načtení Preferences.
+    expect(getMock).toHaveBeenCalledTimes(1);
+
+    // Služba dokončila inicializaci a při value: null má prázdnou historii.
+    expect(service.initialized()).toBe(true);
+    expect(service.counters()).toEqual([]);
+  });
+
+  // TODO: samostatně doplňte testy scénářů 1–5 ze zadání.
+});
+```
+
+Připravený test ověřuje první spuštění bez uložených dat i opakovanou inicializaci. Dvě volání předaná do `Promise.all()` simulují souběžné požadavky. Třetí volání proběhne až po dokončení inicializace. Ve všech případech musí služba použít uložený Promise, takže `Preferences.get()` bude zavoláno pouze jednou.
+
+### Užitečné vzory
+
+Následující zápisy můžete v testech použít. Nejde o hotové řešení scénářů. První ukázka připraví data v Preferences a ověří jejich načtení:
+
+```typescript
+// Určíme, co má falešná metoda Preferences.get() vrátit.
+getMock.mockResolvedValue({
+  // Preferences ukládají pouze řetězce, proto pole převedeme na JSON.
+  value: JSON.stringify([first, second]),
+});
+
+// Počkáme, až služba hodnotu načte, převede z JSON a aktualizuje signal.
+await service.initialize();
+
+// Signal musí po inicializaci obsahovat stejné dva objekty.
+expect(service.counters()).toEqual([first, second]);
+
+// Současně ověříme, že služba četla správný klíč Preferences.
+expect(getMock).toHaveBeenCalledWith({ key: 'saved-counters' });
+```
+
+`mockResolvedValue()` nastavuje budoucí výsledek asynchronní metody. Objekt se nevrátí okamžitě jako běžná návratová hodnota, ale jako úspěšně dokončený `Promise`. Hodnota uvnitř musí být řetězec, protože Preferences neumějí přímo ukládat pole objektů.
+
+Zápis do Preferences je jiný scénář. `initialize()` pouze čte, takže sama `Preferences.set()` nezavolá. Kontrolu `setMock` proveďte až po operaci, která stav skutečně mění, například po `add()`:
+
+```typescript
+// Metoda add() nejprve zajistí inicializaci, přidá objekt a potom stav uloží.
+await service.add(first);
+
+// Ověříme přesný objekt předaný do Preferences.set().
+expect(setMock).toHaveBeenCalledWith({
+  // Služba musí pro čtení i zápis používat stejný klíč.
+  key: 'saved-counters',
+
+  // Pole ve stavu služby musí být před uložením převedeno na JSON řetězec.
+  value: JSON.stringify([first]),
+});
+```
+
+Asynchronní test označíme klíčovým slovem `async` a před voláním asynchronní metody použijeme `await`:
+
+```typescript
+// async dovoluje uvnitř testu používat await.
+it('popis scénáře', async () => {
+  // Test se zde pozastaví, dokud initialize() svůj Promise nedokončí.
+  await service.initialize();
+
+  // Očekávání zapisujeme až potom, kdy služba stihla načíst a zpracovat data.
+  expect(service.initialized()).toBe(true);
+});
+```
+
+Bez `await` by test pokračoval ihned. Očekávání by se mohlo vyhodnotit ještě před dokončením `Preferences.get()` a test by mohl selhávat podle rychlosti provedení, nikoliv podle správnosti služby.
+
+### Rozšiřující scénář: poškozená uložená data
+
+Služba může v Preferences najít dva různé druhy chybných dat:
+
+- **syntakticky neplatný JSON**, například `'this is not a valid JSON'`; chyba vznikne přímo při volání `JSON.parse()`,
+- **platný JSON nesprávného tvaru**, například `'{"name":"test"}'`; převod proběhne, ale výsledkem je objekt místo očekávaného pole a služba vyvolá vlastní chybu `Uložená historie nemá očekávaný formát pole.`
+
+V obou případech blok `catch` chybu zachytí, zapíše ji pomocí `console.error()`, nastaví prázdnou historii a blok `finally` dokončí inicializaci. Test má ověřit především to, že služba nespadne a vrátí se do bezpečného stavu.
+
+Postup testu je následující:
+
+1. nastavte chybnou hodnotu vrácenou z Preferences,
+2. vytvořte spy na `console.error`,
+3. teprve potom zavolejte a očekejte `service.initialize()`,
+4. zkontrolujte stav služby a zachycený výpis,
+5. spy nakonec obnovte pomocí `mockRestore()`.
+
+> **Na pořadí záleží:** Spy musí vzniknout **před** `service.initialize()`, protože `console.error()` se zavolá právě během inicializace. Spy vytvořený až po `await service.initialize()` už proběhlé volání nezachytí.
+
+Jednoduchá kostra testu syntakticky neplatného JSON:
+
+```typescript
+it('should recover from invalid JSON', async () => {
+  // 1. Preferences vrátí text, který nelze převést pomocí JSON.parse().
+  getMock.mockResolvedValue({
+    value: 'this is not a valid JSON',
+  });
+
+  // 2. Sledování musíme zapnout ještě před spuštěním initialize().
+  // mockImplementation zároveň zabrání vypsání očekávané chyby do testovacího výstupu.
+  const errorSpy = vi
+    .spyOn(console, 'error')
+    .mockImplementation(() => undefined);
+
+  // 3. Chyba vznikne a bude zachycena uvnitř této inicializace.
+  await service.initialize();
+
+  // 4. Služba nespadla a přešla do bezpečného prázdného stavu.
+  expect(service.counters()).toEqual([]);
+  expect(service.initialized()).toBe(true);
+
+  // CounterService volá console.error se zprávou a zachyceným objektem Error.
+  expect(errorSpy).toHaveBeenCalledWith(
+    'Historii počítadel se nepodařilo načíst.',
+    expect.any(Error),
+  );
+
+  // 5. Vrátíme console.error do původního stavu pro ostatní testy.
+  errorSpy.mockRestore();
+});
+```
+
+Pro druhou variantu změňte pouze připravenou hodnotu:
+
+```typescript
+getMock.mockResolvedValue({
+  value: JSON.stringify({ name: 'test' }),
+});
+```
+
+Jde o platný JSON, takže `JSON.parse()` uspěje. Následná kontrola `Array.isArray(parsed)` ale zjistí, že výsledkem není pole. Očekávání prázdné historie, dokončené inicializace a volání `console.error()` zůstávají stejná.
+
+V `toHaveBeenCalledWith()` je prvním argumentem přesný text zprávy služby a druhým argumentem objekt chyby, který jednoduše ověříme pomocí `expect.any(Error)`.
+
+### Spuštění a odevzdání
+
+Nejprve spusťte pouze test služby:
+
+```bash
+npm test -- --watch=false --include=src/app/services/counter.service.spec.ts
+```
+
+Potom ověřte celou testovací sadu:
+
+```bash
+npm test -- --watch=false
+```
+
+Odevzdaný testovací soubor musí obsahovat připravený inicializační test a samostatně implementované scénáře 1–4. Scénář 5 s poškozenými daty je rozšiřující úloha. Testy musí být navzájem nezávislé – žádný test nesmí spoléhat na stav vytvořený předchozím testem.
+
+## 14. Produkční sestavení
 
 Ukončete vývojový server pomocí `Ctrl+C` a spusťte:
 
 ```bash
+npm test -- --watch=false
 npm run lint
 ionic build
 ```
 
 Po instalaci pluginu musí být změněné soubory `package.json` a `package-lock.json`. Nevytvářejte ani neupravujte nativní adresáře ručně.
 
-## 14. Uložení práce do Gitu
+## 15. Uložení práce do Gitu
 
 Nejprve zkontrolujte změny:
 
@@ -540,7 +780,7 @@ git log --oneline -3
 
 Pracovní strom má být čistý a nejnovější commit má obsahovat řešení CV4.
 
-## 15. Kontrolní seznam CV4
+## 16. Kontrolní seznam CV4
 
 - [ ] Pracuji ve větvi `cv4/preferences`.
 - [ ] Projekt obsahuje `@capacitor/preferences` hlavní verze 8.
@@ -553,10 +793,13 @@ Pracovní strom má být čistý a nejnovější commit má obsahovat řešení 
 - [ ] Záložka Historie zobrazuje všechny uložené záznamy.
 - [ ] Lze odstranit jeden záznam i celou historii.
 - [ ] Data přežijí obnovení stránky.
+- [ ] `counter.service.spec.ts` obsahuje připravený inicializační test a povinné scénáře 1–4.
+- [ ] Testy používají mock Preferences a nezapisují do skutečného úložiště.
+- [ ] `npm test -- --watch=false` skončí bez chyby.
 - [ ] `npm run lint` a `ionic build` skončí bez chyby.
 - [ ] Výsledek je uložený v Git commitu.
 
-## 16. Bonusové úkoly
+## 17. Bonusové úkoly
 
 Po dokončení povinné části můžete:
 
@@ -568,7 +811,7 @@ Po dokončení povinné části můžete:
 
 Potvrzovací dialog a toast budou podrobněji využity v některém z následujících cvičení. Bonusové řešení proto držte oddělené od služby pro ukládání dat.
 
-## 17. Nejčastější problémy
+## 18. Nejčastější problémy
 
 ### `Cannot find module '@capacitor/preferences'`
 
@@ -624,5 +867,6 @@ To je očekávané. Služba chybu zachytí, vypíše její příčinu pro vývoj
 - [Angular – Creating and using services](https://angular.dev/guide/di/creating-and-using-services)
 - [Angular – Signals](https://angular.dev/guide/signals)
 - [Angular – Dependency injection](https://angular.dev/guide/di)
+- [Angular – Testing services](https://angular.dev/guide/testing/services)
 - [Angular – DatePipe](https://angular.dev/api/common/DatePipe)
 - [Ionic UI Components](https://ionicframework.com/docs/components)
