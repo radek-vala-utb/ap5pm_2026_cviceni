@@ -20,8 +20,8 @@ Soubor `.nvmrc` v kořeni repozitáře určuje Node.js 26. Pokud používáte `n
 | [CV2](cv02/README.md) | CounterApp: záložky, Angular datové vazby a Ionic komponenty |
 | [CV3](cv03/README.md) | Znovupoužitelná komponenta a komunikace mezi komponentami |
 | [CV4](cv04/README.md) | Sdílená služba, signals a lokální perzistence pomocí Capacitor Preferences |
-| CV5 | Bude doplněno |
-| CV6 | Bude doplněno |
+| [CV5](cv05/README.md) | OpenHolidays REST API, odpočet do svátku a zpracování chyb |
+| [CV6](cv06/README.md) | První nativní sestavení pro Android, emulátor a ladění WebView |
 | CV7 | Bude doplněno |
 | CV8 | Bude doplněno |
 | CV9 | Bude doplněno |

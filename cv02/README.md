@@ -36,7 +36,7 @@ Data zatím nebudou trvale uložena. Po obnovení stránky se počítadlo vrát�
 
 <img src="./counter_app_cv02.png" alt="Výsledná podoba aplikace CounterApp v CV02" width="320">
 
-## 2. Kontrola prostředí
+## 2. Kontrola prostředí (Volitelně)
 
 ### Windows – PowerShell
 
@@ -74,7 +74,7 @@ nvm use 26
 node --version
 ```
 
-## 3. Vytvoření pracovního adresáře
+## 3. Vytvoření pracovního adresáře (Pokud již nemáte)
 
 Projekt nevytvářejte uvnitř adresáře `cviceni`. Výukové pokyny a vlastní zdrojové kódy tak zůstanou oddělené.
 
@@ -105,7 +105,7 @@ code .
 ### macOS – Terminal
 
 ```bash
-fgbh
+ionic start counter-app tabs --type=angular-standalone --capacitor
 cd counter-app
 code .
 ```
