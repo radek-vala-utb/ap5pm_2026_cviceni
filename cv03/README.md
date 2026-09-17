@@ -499,7 +499,191 @@ V prohlížeči postupně ověřte:
 
 Otevřete Developer Tools a zkontrolujte, že konzole neobsahuje červené chyby.
 
-## 14. Produkční sestavení
+## 14. Migrace testů do CounterComponent
+
+V CV2 vlastnila stav a logiku počítadla stránka `Tab1Page`, proto byly testy metod `increment()`, `decrement()` a `reset()` v souboru `tab1.page.spec.ts`. Po refaktoringu patří tyto metody komponentě `CounterComponent`.
+
+Testy nemažte jen proto, že se změnila struktura aplikace. Přesuňte je za logikou, kterou ověřují:
+
+```text
+CV2                              CV3
+Tab1Page                         CounterComponent
+├── count                        ├── count
+├── increment()                  ├── increment()
+├── decrement()       ─────►     ├── decrement()
+├── reset()                      ├── reset()
+└── tab1.page.spec.ts            └── counter.component.spec.ts
+```
+
+`Tab1Page` má po refaktoringu jinou odpovědnost: přijímá hotový objekt z komponenty a přidává jej do seznamu. Její test proto upravíme tak, aby ověřoval právě toto chování.
+
+### Testy CounterComponent
+
+Generátor z kapitoly 5 vytvořil soubor:
+
+```text
+src/app/components/counter/counter.component.spec.ts
+```
+
+Nahraďte jeho obsah:
+
+```typescript
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { SavedCounter } from '../../models/saved-counter';
+import { CounterComponent } from './counter.component';
+
+describe('CounterComponent', () => {
+  let component: CounterComponent;
+  let fixture: ComponentFixture<CounterComponent>;
+
+  beforeEach(() => {
+    fixture = TestBed.createComponent(CounterComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should increment the counter', () => {
+    component.increment();
+
+    expect(component.count).toBe(1);
+  });
+
+  it('should decrement but never go below zero', () => {
+    component.decrement();
+    expect(component.count).toBe(0);
+
+    component.count = 2;
+    component.decrement();
+    expect(component.count).toBe(1);
+  });
+
+  it('should reset the counter', () => {
+    component.count = 5;
+
+    component.reset();
+
+    expect(component.count).toBe(0);
+  });
+
+  it('should not save without a name', () => {
+    const emitted: SavedCounter[] = [];
+    component.saved.subscribe((counter) => emitted.push(counter));
+    component.counterName = '   ';
+    component.count = 3;
+
+    component.save();
+
+    expect(emitted).toEqual([]);
+  });
+
+  it('should emit a saved counter and reset its state', () => {
+    const emitted: SavedCounter[] = [];
+    component.saved.subscribe((counter) => emitted.push(counter));
+    component.counterName = ' Návštěvníci ';
+    component.count = 3;
+
+    component.save();
+
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]).toMatchObject({
+      name: 'Návštěvníci',
+      value: 3,
+    });
+    expect(emitted[0].id).toEqual(expect.any(String));
+    expect(component.counterName).toBe('');
+    expect(component.count).toBe(0);
+  });
+});
+```
+
+První čtyři testy odpovídají chování, které bylo v CV2 součástí `Tab1Page`. Poslední dva testy ověřují novou odpovědnost komponenty:
+
+- prázdný název nesmí vyvolat událost,
+- platný název vytvoří objekt `SavedCounter`,
+- mezery na začátku a konci názvu se odstraní,
+- objekt obsahuje identifikátor, název a hodnotu,
+- po uložení se komponenta připraví pro nové počítadlo.
+
+`component.saved.subscribe(...)` zachytí data odeslaná pomocí `saved.emit(...)`. V testu tak zastupuje rodičovskou komponentu.
+
+Spusťte pouze testy komponenty:
+
+```bash
+npm test -- --watch=false --include=src/app/components/counter/counter.component.spec.ts
+```
+
+Všech šest testů musí projít.
+
+### Úprava testu Tab1Page
+
+V souboru:
+
+```text
+src/app/tab1/tab1.page.spec.ts
+```
+
+již nemají být testy metod `increment()`, `decrement()` a `reset()`, protože `Tab1Page` tyto metody nevlastní. Nahraďte obsah souboru:
+
+```typescript
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { SavedCounter } from '../models/saved-counter';
+import { Tab1Page } from './tab1.page';
+
+describe('Tab1Page', () => {
+  let component: Tab1Page;
+  let fixture: ComponentFixture<Tab1Page>;
+
+  beforeEach(() => {
+    fixture = TestBed.createComponent(Tab1Page);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should add the newest saved counter to the beginning', () => {
+    const first: SavedCounter = {
+      id: 'first',
+      name: 'První',
+      value: 1,
+    };
+    const second: SavedCounter = {
+      id: 'second',
+      name: 'Druhé',
+      value: 2,
+    };
+
+    component.onSaved(first);
+    component.onSaved(second);
+
+    expect(component.savedCounters).toEqual([second, first]);
+  });
+});
+```
+
+Tento test nezkoumá vnitřní implementaci `CounterComponent`. Ověřuje pouze odpovědnost rodiče: přijatý objekt se uloží a nejnovější položka bude první.
+
+### Spuštění celé sady
+
+Nakonec spusťte všechny testy projektu:
+
+```bash
+npm test -- --watch=false
+```
+
+Všechny testy z CV2 i CV3 musí projít. Pokud starý test hlásí, že v `Tab1Page` neexistuje metoda `increment`, `decrement` nebo `reset`, zůstal v `tab1.page.spec.ts` test odpovědnosti, která již patří `CounterComponent`.
+
+> **Pravidlo pro další práci:** Testy patří ke komponentě nebo službě, která vlastní testované chování. Když se při refaktoringu přesune odpovědnost, mají se spolu s ní přesunout nebo upravit také testy.
+
+## 15. Produkční sestavení
 
 Ukončete vývojový server pomocí `Ctrl+C` a spusťte kontrolní build.
 
@@ -517,7 +701,7 @@ ionic build
 
 Build musí skončit bez chyby. Varování není totéž co chyba; pokud si nejste významem výpisu jistí, přiložte jej k dotazu vyučujícímu.
 
-## 15. Kontrola změn a Git commit
+## 16. Kontrola změn a Git commit
 
 ### Windows – PowerShell
 
@@ -555,7 +739,7 @@ git log --oneline -3
 
 Pracovní strom má být čistý a nejnovější commit má obsahovat řešení CV3.
 
-## 16. Kontrolní seznam CV3
+## 17. Kontrolní seznam CV3
 
 - [ ] Pracuji ve větvi `cv3/reusable-counter`.
 - [ ] `CounterComponent` byla vytvořena Angular generátorem.
@@ -566,10 +750,14 @@ Pracovní strom má být čistý a nejnovější commit má obsahovat řešení 
 - [ ] Potomek odesílá rodiči typovaný objekt přes output.
 - [ ] Seznam používá `@if`, `@for` a `track counter.id`.
 - [ ] Lze uložit více počítadel a nejnovější je první.
+- [ ] Testy logiky počítadla jsou v `counter.component.spec.ts`.
+- [ ] Test komponenty ověřuje také validaci názvu a událost `saved`.
+- [ ] `tab1.page.spec.ts` testuje pouze odpovědnost rodičovské stránky.
+- [ ] `npm test -- --watch=false` skončí bez chyby.
 - [ ] Příkaz `ionic build` skončí bez chyby.
 - [ ] Výsledek je uložený v Git commitu.
 
-## 17. Bonusové úkoly
+## 18. Bonusové úkoly
 
 Po dokončení povinné části můžete:
 
@@ -581,7 +769,7 @@ Po dokončení povinné části můžete:
 
 Dvě instance komponenty musí mít navzájem nezávislý stav. Tím ověříte, že stav skutečně patří jednotlivé instanci `CounterComponent`.
 
-## 18. Nejčastější problémy
+## 19. Nejčastější problémy
 
 ### `app-counter is not a known element`
 
@@ -635,5 +823,7 @@ Jde o očekávané chování CV3. Pole `savedCounters` existuje pouze v paměti 
 - [Angular – Accepting data with input properties](https://angular.dev/guide/components/inputs)
 - [Angular – Custom events with outputs](https://angular.dev/guide/components/outputs)
 - [Angular – Control flow](https://angular.dev/guide/templates/control-flow)
+- [Angular – Basics of testing components](https://angular.dev/guide/testing/components-basics)
+- [Angular CLI – `ng test`](https://angular.dev/cli/test)
 - [Ionic UI Components](https://ionicframework.com/docs/components)
 - [MDN – crypto.randomUUID](https://developer.mozilla.org/docs/Web/API/Crypto/randomUUID)
