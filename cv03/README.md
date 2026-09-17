@@ -50,6 +50,12 @@ git status
 code .
 ```
 
+Pokud na macOS příkaz `code .` není dostupný, použijte:
+
+```bash
+open -a "Visual Studio Code" .
+```
+
 Pokud Node.js nepoužíváte přes `nvm`, příkaz `nvm use 26` vynechte. `node --version` musí začínat `v26.`.
 
 Výstup `git status` musí před zahájením hlásit čistý pracovní strom. Pokud obsahuje změny z CV2, nejprve je zkontrolujte a uložte do commitu.

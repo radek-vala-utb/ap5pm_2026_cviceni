@@ -86,6 +86,12 @@ git switch -c cv6/android
 code .
 ```
 
+Pokud na macOS příkaz `code .` není dostupný, použijte:
+
+```bash
+open -a "Visual Studio Code" .
+```
+
 Pokud Node.js nepoužíváte přes `nvm`, příkaz `nvm use 26` vynechte. Pokud větev existuje, použijte `git switch cv6/android`.
 
 Před zahájením má `git status` hlásit čistý pracovní strom. Adresář `android/` zatím v projektu být nemá.

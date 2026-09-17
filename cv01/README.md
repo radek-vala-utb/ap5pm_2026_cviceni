@@ -173,7 +173,13 @@ Otevřete jej ve VS Code:
 code .
 ```
 
-Pokud příkaz `code` není dostupný, otevřete VS Code běžným způsobem a zvolte **File → Open Folder**.
+Pokud na macOS příkaz `code .` není dostupný, použijte:
+
+```bash
+open -a "Visual Studio Code" .
+```
+
+Projekt můžete také otevřít přímo ve VS Code pomocí **File → Open Folder**.
 
 ## 6. Kontrola vytvořeného projektu
 

@@ -53,6 +53,12 @@ git switch -c cv4/preferences
 code .
 ```
 
+Pokud na macOS příkaz `code .` není dostupný, použijte:
+
+```bash
+open -a "Visual Studio Code" .
+```
+
 Pokud Node.js nepoužíváte přes `nvm`, příkaz `nvm use 26` vynechte. Pokud větev již existuje, použijte místo vytvoření:
 
 ```bash
