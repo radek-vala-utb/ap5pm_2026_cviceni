@@ -490,7 +490,117 @@ V prohlížeči ověřte:
 
 Otevřete Developer Tools prohlížeče a zkontrolujte, že v konzoli nejsou červené chyby. Zapněte simulaci mobilního displeje a vyzkoušejte úzkou i širokou obrazovku.
 
-## 13. Produkční sestavení webové části
+## 13. Minimální automatizované testy
+
+Ruční vyzkoušení aplikace v prohlížeči je důležité, ale při každé další změně bychom museli všechny situace kontrolovat znovu. Několik malých automatizovaných testů dokáže rychle ověřit základní pravidla počítadla.
+
+Projekt vytvořený pomocí Angularu 22 již obsahuje testovací nástroje a soubor:
+
+```text
+src/app/tab1/tab1.page.spec.ts
+```
+
+Přípona `.spec.ts` označuje soubor s testy. Testy se nepřidávají do výsledné aplikace určené uživatelům.
+
+### Úprava testu komponenty
+
+Otevřete `src/app/tab1/tab1.page.spec.ts` a nahraďte jeho obsah:
+
+```typescript
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { Tab1Page } from './tab1.page';
+
+describe('Tab1Page', () => {
+  let component: Tab1Page;
+  let fixture: ComponentFixture<Tab1Page>;
+
+  beforeEach(() => {
+    fixture = TestBed.createComponent(Tab1Page);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should increment the counter', () => {
+    component.increment();
+
+    expect(component.count).toBe(1);
+  });
+
+  it('should decrement but never go below zero', () => {
+    component.decrement();
+    expect(component.count).toBe(0);
+
+    component.count = 2;
+    component.decrement();
+    expect(component.count).toBe(1);
+  });
+
+  it('should reset the counter and update the template', () => {
+    component.count = 5;
+    component.reset();
+    fixture.detectChanges();
+
+    const value = fixture.nativeElement.querySelector(
+      '.counter-value',
+    ) as HTMLElement;
+
+    expect(component.count).toBe(0);
+    expect(value.textContent?.trim()).toBe('0');
+  });
+});
+```
+
+### Jak test funguje
+
+| Zápis | Význam |
+| --- | --- |
+| `describe()` | Seskupuje testy jedné komponenty. |
+| `beforeEach()` | Před každým testem vytvoří novou čistou instanci stránky. |
+| `TestBed.createComponent()` | Vytvoří komponentu a její testovací HTML. |
+| `fixture.componentInstance` | Zpřístupní instanci třídy `Tab1Page`. |
+| `it()` | Definuje jeden konkrétní testovaný scénář. |
+| `expect(...).toBe(...)` | Porovná skutečný a očekávaný výsledek. |
+| `fixture.detectChanges()` | Promítne změněný stav komponenty do HTML šablony. |
+| `querySelector()` | Najde prvek ve vykreslené testovací šabloně. |
+
+Funkce `describe`, `beforeEach`, `it` a `expect` pocházejí z Vitestu. Importujeme je explicitně, aby jejich původ byl zřejmý a aby správně fungovalo našeptávání i typová kontrola v editoru. Není potřeba instalovat typy pro Jest ani Mocha.
+
+Každý test má ověřovat jednu srozumitelnou vlastnost. Test ochrany proti záporné hodnotě kontroluje obě větve: při nule se hodnota nezmění a při kladné hodnotě se sníží.
+
+Poslední test nejprve ověřuje stav TypeScript komponenty a potom také text zobrazený v HTML. Volání `fixture.detectChanges()` je nutné, protože změna vlastnosti v testu se do šablony nepromítne automaticky ve stejném okamžiku.
+
+### Spuštění testů
+
+Pro jednorázové spuštění všech testů použijte:
+
+```bash
+npm test -- --watch=false
+```
+
+Úspěšný výstup obsahuje počet testovacích souborů a testů se stavem `passed`. Pokud test neprojde, Vitest vypíše název scénáře, očekávanou hodnotu a skutečný výsledek.
+
+Během vývoje lze spustit watch režim:
+
+```bash
+npm test
+```
+
+Proces zůstane spuštěný a po uložení zdrojového nebo testovacího souboru testy zopakuje. Ukončíte jej pomocí `Ctrl+C`.
+
+Chcete-li jednorázově spustit pouze test první záložky, použijte:
+
+```bash
+npm test -- --watch=false --include=src/app/tab1/tab1.page.spec.ts
+```
+
+> **Důležité:** Procházející testy neznamenají, že je aplikace bezchybná. Ověřují pouze scénáře, které jsme skutečně zapsali. Nenahrazují proto ruční kontrolu vzhledu, ovládání a navigace v prohlížeči.
+
+## 14. Produkční sestavení webové části
 
 Nejprve ukončete `ionic serve` pomocí `Ctrl+C`. Potom ověřte, že se projekt dokáže sestavit bez vývojového serveru.
 
@@ -508,7 +618,7 @@ ionic build
 
 Úspěšný příkaz vytvoří webové soubory v adresáři `www`. Tento adresář bude Capacitor později kopírovat do Android nebo iOS projektu.
 
-## 14. Uložení práce do Gitu
+## 15. Uložení práce do Gitu
 
 Nejprve zkontrolujte stav repozitáře.
 
@@ -556,7 +666,7 @@ git commit -m "Implementace zakladniho pocitadla"
 
 Do Gitu nepatří adresář `node_modules`. Vygenerovaný projekt jej již má uvedený v `.gitignore`. Před commitem si vždy prohlédněte výstup `git status`.
 
-## 15. Kontrolní seznam CV2
+## 16. Kontrolní seznam CV2
 
 - [ ] Projekt byl vytvořen s typem `angular-standalone` a šablonou `tabs`.
 - [ ] Aplikace se spustí pomocí `ionic serve`.
@@ -568,10 +678,12 @@ Do Gitu nepatří adresář `node_modules`. Vygenerovaný projekt jej již má u
 - [ ] Hodnota počítadla nemůže být záporná.
 - [ ] Záložky mají nové názvy a ikony.
 - [ ] Záložka O aplikaci obsahuje mé jméno.
+- [ ] Testy ověřují inkrementaci, snížení bez záporné hodnoty a reset.
+- [ ] `npm test -- --watch=false` skončí bez chyby.
 - [ ] Příkaz `ionic build` skončí bez chyby.
 - [ ] Změny jsou uloženy v lokálním Git commitu.
 
-## 16. Bonusové úkoly
+## 17. Bonusové úkoly
 
 Po dokončení povinné části můžete:
 
@@ -582,7 +694,29 @@ Po dokončení povinné části můžete:
 
 Bonus nesmí porušit pravidlo, že hodnota nemůže klesnout pod nulu.
 
-## 17. Nejčastější problémy
+## 18. Nejčastější problémy
+
+### `Cannot find name 'describe'`
+
+Projekt používá testovací nástroj Vitest, nikoliv Jest nebo Mocha. Neinstalujte proto balíčky `@types/jest` ani `@types/mocha`. Na začátku souboru `tab1.page.spec.ts` musí být explicitní import:
+
+```typescript
+import { beforeEach, describe, expect, it } from 'vitest';
+```
+
+Pokud editor stále hlásí chybu:
+
+1. zkontrolujte, že je soubor uložený jako `src/app/tab1/tab1.page.spec.ts`,
+2. v kořeni projektu spusťte `npm ls vitest`,
+3. pokud chybí celý adresář `node_modules`, spusťte `npm install`,
+4. zkontrolujte, že `tsconfig.spec.json` zahrnuje soubory `src/**/*.spec.ts`,
+5. ve VS Code otevřete paletu příkazů a spusťte **TypeScript: Restart TS Server**.
+
+Správnost testovacího prostředí nakonec ověřte příkazem:
+
+```bash
+npm test -- --watch=false --include=src/app/tab1/tab1.page.spec.ts
+```
 
 ### `Can't bind to 'ngModel'`
 
@@ -623,3 +757,5 @@ Bez pokynu vyučujícího nespouštějte `npm audit fix --force`. Příkaz můž
 - [Angular – Adding event listeners](https://angular.dev/guide/templates/event-listeners)
 - [Angular – Two-way binding](https://angular.dev/guide/templates/two-way-binding)
 - [Angular – Importing and using components](https://angular.dev/guide/components/importing)
+- [Angular – Basics of testing components](https://angular.dev/guide/testing/components-basics)
+- [Angular CLI – `ng test`](https://angular.dev/cli/test)
