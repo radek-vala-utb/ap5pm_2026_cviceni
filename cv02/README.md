@@ -319,6 +319,27 @@ Nahraďte celý obsah:
 </ion-content>
 ```
 
+> **Poznámka – značka v HTML nestačí:** Každá značka Ionic použitá v šabloně musí být zpřístupněna také ve Standalone komponentě v souboru `tab1.page.ts`. Například `<ion-card>` odpovídá třídě `IonCard`, `<ion-button>` třídě `IonButton` a `<ion-input>` třídě `IonInput`. Třída musí být jednak importována z balíčku `@ionic/angular`, jednak uvedena v poli `imports` dekorátoru `@Component`. Pokud některý z těchto kroků chybí, Angular značku nezná a sestavení skončí chybou typu `ion-card is not a known element`.
+>
+> Ve VS Code lze import často doplnit automaticky. Umístěte kurzor na červeně podtrženou značku v HTML a otevřete nabídku **Quick Fix** pomocí `Ctrl+.` na Windows/Linuxu nebo `Cmd+.` na macOS. Zvolte nabídku pro import příslušné komponenty do `Tab1Page`. Angular Language Service následně doplní TypeScript import a položku do pole `imports`. Po automatické úpravě vždy otevřete `tab1.page.ts` a oba kroky zkontrolujte. Pokud se Quick Fix nenabízí, uložte oba soubory, zkontrolujte rozšíření Angular Language Service a import doplňte ručně podle příkladu v předchozí kapitole.
+
+Převod nejčastěji použitých prvků v této šabloně:
+
+| HTML šablona | Import v `tab1.page.ts` |
+| --- | --- |
+| `<ion-header>` | `IonHeader` |
+| `<ion-toolbar>` | `IonToolbar` |
+| `<ion-title>` | `IonTitle` |
+| `<ion-content>` | `IonContent` |
+| `<ion-card>` | `IonCard` |
+| `<ion-card-header>` | `IonCardHeader` |
+| `<ion-card-title>` | `IonCardTitle` |
+| `<ion-card-content>` | `IonCardContent` |
+| `<ion-input>` | `IonInput` |
+| `<ion-button>` | `IonButton` |
+
+`[(ngModel)]` není Ionic značka. Tuto Angular direktivu zpřístupňuje `FormsModule`, který musí být stejným způsobem importovaný a uvedený v poli `imports`.
+
 Použité datové vazby:
 
 | Zápis | Význam |
@@ -575,7 +596,7 @@ import { FormsModule } from '@angular/forms';
 
 ### `ion-card is not a known element`
 
-Příslušná Ionic komponenta chybí v TypeScript importech nebo v poli `imports`. Zkontrolujte například `IonCard`, `IonCardHeader`, `IonCardTitle` a `IonCardContent`.
+Příslušná Ionic komponenta chybí v TypeScript importech nebo v poli `imports`. Zkontrolujte například `IonCard`, `IonCardHeader`, `IonCardTitle` a `IonCardContent`. Na podtržené značce můžete otevřít Quick Fix pomocí `Ctrl+.` na Windows/Linuxu nebo `Cmd+.` na macOS a nechat VS Code import doplnit.
 
 ### Tlačítko nic nedělá
 
