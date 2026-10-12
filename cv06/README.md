@@ -104,7 +104,7 @@ Otevřete `capacitor.config.ts`:
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'cz.uhk.ap5pm.counterapp',
+  appId: 'cz.utb.fai.ap5pm.counterapp',
   appName: 'CounterApp',
   webDir: 'www',
 };
@@ -344,7 +344,7 @@ Emulátor používá síť hostitelského počítače, ale z pohledu aplikace jd
 V Android Studiu otevřete **View → Tool Windows → Logcat**.
 
 1. Vyberte běžící emulátor.
-2. Vyberte proces aplikace s ID `cz.uhk.ap5pm.counterapp` nebo vlastním `appId`.
+2. Vyberte proces aplikace s ID `cz.utb.fai.ap5pm.counterapp` nebo vlastním `appId`.
 3. Nastavte úroveň alespoň na **Info**.
 4. Přepínejte záložky a zopakujte načtení svátků.
 5. Při testu bez sítě najděte zprávy související s WebView nebo HTTP chybou.

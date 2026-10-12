@@ -22,8 +22,8 @@ Soubor `.nvmrc` v kořeni repozitáře určuje Node.js 26. Pokud používáte `n
 | [CV4](cv04/README.md) | Sdílená služba, signals a lokální perzistence pomocí Capacitor Preferences |
 | [CV5](cv05/README.md) | OpenHolidays REST API, odpočet do svátku a zpracování chyb |
 | [CV6](cv06/README.md) | První nativní sestavení pro Android, emulátor a ladění WebView |
-| CV7 | Bude doplněno |
-| CV8 | Bude doplněno |
+| [CV7](cv07/README.md) | PhotoGallery: fotoaparát, souborový systém, perzistence a APK |
+| [CV8](cv08/README.md) | CounterApp v cloudu: Firebase Authentication a Cloud Firestore |
 | CV9 | Bude doplněno |
 | CV10 | Bude doplněno |
 
