@@ -1,18 +1,9 @@
 # CV8 – Cloudová historie krok za krokem
 
-## Cíl a plán na 90 minut
+## Cíl cvičení
 
 Navazujete na [CV7](../cv07/README.md): máte nastavený Firebase projekt, anonymní přihlášení a funkční lokální CounterApp. Dnes nahradíte úložiště historie službou pro Cloud Firestore. Model `SavedCounter` a komponenta počítadla se nemění.
 
-| Čas | Náplň |
-| --- | --- |
-| 0–10 min | Identita, struktura dat a pravidla |
-| 10–30 min | Kostra služby a jednorázové načtení |
-| 30–50 min | Zápis a přepojení stránek |
-| 50–60 min | Samostatné doplnění mazání |
-| 60–75 min | Přechod na živý posluchač a dvě karty |
-| 75–85 min | Oddělení uživatelů a odmítnutí cizího přístupu |
-| 85–90 min | Kontrola a commit |
 
 **Výsledek:** záznamy přežijí obnovení stránky, dvě karty stejného uživatele sdílejí změny a cizí uživatel k nim nemá přístup. Android a další rozšíření jsou bonus; nemusíte je stihnout během cvičení.
 

@@ -1,17 +1,9 @@
 # CV7 – Firebase a identita uživatele
 
-## Cíl a plán na 90 minut
+## Cíl cvičení
 
 Pokračujte v `counter-app` po [CV6](../cv06/README.md). Dnes připojíte Firebase a zjistíte, jak aplikace pozná svého uživatele bez formuláře s heslem. Historie bude stále uložená lokálně pomocí Preferences. Cloudovou databázi použijete až v [CV8](../cv08/README.md).
 
-| Čas | Náplň |
-| --- | --- |
-| 0–10 min | Výchozí aplikace, lokální data a identita |
-| 10–30 min | Firebase projekt a nastavení služeb |
-| 30–45 min | SDK a konfigurace |
-| 45–65 min | Postupné sestavení přihlašovací služby |
-| 65–80 min | Zobrazení identity a pokusy ve dvou oknech |
-| 80–90 min | Kontrola, commit a rezerva |
 
 **Výsledek:** aplikace zobrazí UID, po obnovení ho zachová a v soukromém okně získá jinou identitu. Nejde zatím o sdílení účtu mezi zařízeními.
 
