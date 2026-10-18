@@ -1,308 +1,349 @@
-# CV8 – CounterApp v cloudu pomocí Firebase
+# CV8 – Cloudová historie krok za krokem
 
-## Cíl cvičení
+## Cíl a plán na 90 minut
 
-V CV4 jste ukládali historii CounterApp lokálně pomocí Capacitor Preferences. V CV8 se vrátíte ke CounterApp a vytvoříte druhou variantu služby, která ukládá záznamy do databáze **Cloud Firestore**. Každá instalace se nejprve anonymně přihlásí pomocí **Firebase Authentication** a bezpečnostní pravidla dovolí uživateli pracovat pouze s jeho vlastními daty.
+Navazujete na [CV7](../cv07/README.md): máte nastavený Firebase projekt, anonymní přihlášení a funkční lokální CounterApp. Dnes nahradíte úložiště historie službou pro Cloud Firestore. Model `SavedCounter` a komponenta počítadla se nemění.
 
-Po dokončení cvičení budete umět:
+| Čas | Náplň |
+| --- | --- |
+| 0–10 min | Identita, struktura dat a pravidla |
+| 10–30 min | Kostra služby a jednorázové načtení |
+| 30–50 min | Zápis a přepojení stránek |
+| 50–60 min | Samostatné doplnění mazání |
+| 60–75 min | Přechod na živý posluchač a dvě karty |
+| 75–85 min | Oddělení uživatelů a odmítnutí cizího přístupu |
+| 85–90 min | Kontrola a commit |
 
-- vytvořit a nakonfigurovat Firebase projekt,
-- registrovat webovou aplikaci a připojit ji pomocí modulárního Firebase SDK,
-- vysvětlit rozdíl mezi Firebase konfigurací a tajným přístupovým údajem,
-- anonymně přihlásit uživatele,
-- zapsat, načíst a odstranit dokumenty v Cloud Firestore,
-- poslouchat změny databáze v reálném čase pomocí `onSnapshot()`,
-- oddělit data uživatelů podle jejich `uid`,
-- vytvořit bezpečnostní pravidla Firestore a ověřit jejich účinek,
-- zobrazit stav připojování, prázdná data a chybu,
-- ověřit cloudovou synchronizaci ve webové a Android aplikaci.
+**Výsledek:** záznamy přežijí obnovení stránky, dvě karty stejného uživatele sdílejí změny a cizí uživatel k nim nemá přístup. Android a další rozšíření jsou bonus; nemusíte je stihnout během cvičení.
 
-CV7 PhotoGallery je samostatný projekt a zůstává beze změny. V tomto cvičení pokračujete v projektu `counter-app` dokončeném v CV6.
+Postupujte po úryvcích. **Přidat metodu** znamená vložit ji dovnitř existující třídy, **nahradit metodu** znamená odstranit její předchozí verzi. Importy průběžně doplňujte podle pokynů. Nevkládejte druhou kopii celé třídy.
 
-> **Proč nepoužíváme AngularFire:** Aktuální AngularFire 20 deklaruje podporu Angularu 20, zatímco kurz používá Angular 22. Firebase JavaScript SDK je oficiální, modulární a nezávislé na verzi Angularu. Po vydání kompatibilního AngularFire lze stejnou architekturu převést na jeho Angular providery.
+V kořeni `counter-app` po dokončeném CV7 vytvořte větev:
 
-## 1. Výchozí stav
-
-Navazujete na CounterApp po CV6. Musí fungovat:
-
-- ruční počítadlo a model `SavedCounter`,
-- historie uložená lokálně pomocí `CounterService` a Preferences,
-- odpočet do svátku z CV5,
-- Android projekt a emulátor z CV6,
-- příkazy `npm run lint`, `ionic build` a `npx cap sync android`.
-
-Model z CV4 má tuto podobu:
-
-```typescript
-export interface SavedCounter {
-  id: string;
-  name: string;
-  value: number;
-  createdAt: string;
-}
-```
-
-Původní `CounterService` nemažte. Novou cloudovou službu vytvoříte vedle ní, abyste mohli porovnat lokální a vzdálenou perzistenci.
-
-## 2. Otevření projektu a vytvoření větve
-
-### Windows – PowerShell
-
-```powershell
-Set-Location "$HOME\AP5PM-projekty\counter-app"
-nvm use 26
+```bash
 git status
-git log --oneline -3
-git switch -c cv8/firebase
-code .
+git switch -c cv8/firestore
 ```
 
-### macOS a Linux – Terminal
+## 1. Kam patří záznam?
 
-```bash
-cd "$HOME/AP5PM-projekty/counter-app"
-nvm use 26
-git status
-git log --oneline -3
-git switch -c cv8/firebase
-code .
-```
-
-Pokud větev již existuje, použijte `git switch cv8/firebase`. Před zahájením má být pracovní strom čistý.
-
-## 3. Vytvoření Firebase projektu
-
-Otevřete [Firebase Console](https://console.firebase.google.com/) a zvolte **Create a project**.
-
-1. Projekt pojmenujte například `ap5pm-counter-vase-jmeno`.
-2. ID projektu musí být globálně jedinečné; navržené ID můžete upravit pouze při vytváření.
-3. Google Analytics pro toto cvičení nepotřebujete a můžete je vypnout.
-4. Počkejte na vytvoření projektu a otevřete jeho přehled.
-
-Nepoužívejte společný projekt jiné osoby. Každý student má mít vlastní databázi, pravidla i kvóty.
-
-### Registrace webové aplikace
-
-V přehledu projektu klikněte na ikonu **Web** `</>`:
-
-1. Přezdívku aplikace nastavte například na `CounterApp Web`.
-2. Firebase Hosting nyní nezapínejte.
-3. Dokončete registraci tlačítkem **Register app**.
-4. Zobrazený objekt `firebaseConfig` si ponechte otevřený; použijete jej v další části.
-
-Registrujete webovou aplikaci i pro Android build CounterApp, protože Ionic běží v Android WebView a používá JavaScriptové Firebase SDK. V tomto cvičení proto nepřidáváte soubor `google-services.json` ani nativní Firebase Android SDK.
-
-## 4. Zapnutí anonymního přihlašování
-
-Ve Firebase Console otevřete **Build → Authentication → Get started**.
-
-1. Na kartě **Sign-in method** vyberte **Anonymous**.
-2. Přepínač nastavte na **Enable**.
-3. Změnu uložte.
-
-Anonymní účet má stabilní `uid` uložené v daném profilu prohlížeče nebo v datech dané instalace aplikace. Uživatel nezadává jméno ani heslo. Vymazání dat aplikace, anonymního účtu nebo úložiště prohlížeče může vytvořit nové `uid`; původní data pak nový účet neuvidí.
-
-## 5. Vytvoření Cloud Firestore
-
-Otevřete **Build → Firestore Database → Create database**.
-
-1. Zvolte databázi v **Production mode**.
-2. Vyberte evropské umístění nejblíže uživatelům, například `eur3`, pokud je v nabídce.
-3. Volbu umístění pečlivě zkontrolujte; po vytvoření ji nelze jednoduše změnit.
-4. Dokončete vytvoření databáze.
-
-Production mode na začátku odmítne všechny požadavky. Přístup povolíte až přesnými pravidly v části 8. Nepoužívejte otevřené testovací pravidlo `allow read, write: if true`.
-
-## 6. Instalace Firebase SDK
-
-V kořeni CounterApp nainstalujte ověřenou verzi modulárního SDK:
-
-```bash
-npm install firebase@12.19.0
-```
-
-Ověřte instalaci:
-
-```bash
-npm ls firebase
-```
-
-Nepotřebujete `firebase-tools` ani globální Firebase CLI. Databázi a pravidla v tomto cvičení nastavíte ve Firebase Console.
-
-## 7. Konfigurace prostředí
-
-Do `src/environments/environment.ts` doplňte konfiguraci z Firebase Console:
-
-```typescript
-export const environment = {
-  production: false,
-  firebase: {
-    apiKey: 'DOPLNTE_VLASTNI_HODNOTU',
-    authDomain: 'DOPLNTE.firebaseapp.com',
-    projectId: 'DOPLNTE',
-    storageBucket: 'DOPLNTE.firebasestorage.app',
-    messagingSenderId: 'DOPLNTE',
-    appId: 'DOPLNTE',
-  },
-};
-```
-
-Stejnou vlastnost `firebase` doplňte také do `src/environments/environment.prod.ts`:
-
-```typescript
-export const environment = {
-  production: true,
-  firebase: {
-    apiKey: 'DOPLNTE_VLASTNI_HODNOTU',
-    authDomain: 'DOPLNTE.firebaseapp.com',
-    projectId: 'DOPLNTE',
-    storageBucket: 'DOPLNTE.firebasestorage.app',
-    messagingSenderId: 'DOPLNTE',
-    appId: 'DOPLNTE',
-  },
-};
-```
-
-Hodnoty nekopírujte z ukázky ani od spolužáka. Vložte celý vlastní objekt z **Project settings → General → Your apps → SDK setup and configuration**.
-
-Firebase webová konfigurace identifikuje projekt, ale není administrátorským tajemstvím. Bezpečnost dat musí zajišťovat Authentication a Firestore Security Rules. Do repozitáře naopak nikdy nepatří soukromý klíč servisního účtu, soubor s admin credentials ani heslo uživatele.
-
-## 8. Bezpečnostní pravidla Firestore
-
-Data uložíme do této struktury:
+Použijeme cestu:
 
 ```text
 users/{uid}/counters/{counterId}
 ```
 
-Ve Firebase Console otevřete **Firestore Database → Rules**, nahraďte výchozí obsah a klikněte na **Publish**:
+`uid` určuje vlastníka, `counterId` je existující `SavedCounter.id`. Dokument obsahuje stejná pole jako model z CV4: `id`, `name`, `value`, `createdAt`. ISO čas v `createdAt` ponecháme beze změny.
+
+**Nejprve sami:** Napište konkrétní cestu pro uživatele `anna` a záznam `pokus-1`. Která část cesty se změní, když Anna uloží druhé počítadlo?
+
+### Pravidla na serveru
+
+Ve **Firestore Database → Rules** publikujte následující pravidla. Stejný obsah uložte do nového souboru `firestore.rules` v kořeni projektu, aby byl součástí Gitu. Samotné uložení souboru pravidla nenasazuje.
 
 ```text
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function ownsUserData(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-
-    function validCounter(counterId) {
-      return request.resource.data.keys().hasOnly([
-          'id', 'name', 'value', 'createdAt'
-        ])
-        && request.resource.data.id == counterId
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() <= 60
-        && request.resource.data.value is int
-        && request.resource.data.createdAt is string;
-    }
-
     match /users/{userId}/counters/{counterId} {
-      allow read: if ownsUserData(userId);
-      allow create, update: if ownsUserData(userId)
-                            && validCounter(counterId);
-      allow delete: if ownsUserData(userId);
+      allow read, write: if request.auth != null
+                        && request.auth.uid == userId;
     }
   }
 }
 ```
 
-Pravidla zajišťují:
+V této verzi řešíme **vlastnictví dat**: přihlášený uživatel smí pracovat pouze pod vlastním UID. Kontrola typů a povolených polí je bonus. Pravidla ostatní cesty nepovolují.
 
-- nepřihlášený klient nemůže číst ani zapisovat,
-- přihlášený klient může pracovat pouze pod vlastním `uid`,
-- ID dokumentu musí odpovídat poli `id`,
-- dokument nesmí obsahovat neočekávaná pole,
-- název má omezenou délku a hodnota musí být celé číslo.
+**Vysvětlete sousedovi:** Proč nestačí načíst všechny uživatele a v Angularu zobrazit jen vlastní záznamy? Pravidla nejsou filtr výsledků; náš dotaz musí směřovat rovnou do povolené kolekce.
 
-Pravidla nejsou filtr. Aplikace musí dotazovat přímo kolekci aktuálního uživatele; nelze načíst všechny uživatele a očekávat, že Firestore nepovolené dokumenty dodatečně odfiltruje.
-
-## 9. Inicializace Firebase klienta
-
-Vytvořte `src/app/firebase.client.ts`:
-
-```typescript
-import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { environment } from '../environments/environment';
-
-const firebaseApp = getApps().length === 0
-  ? initializeApp(environment.firebase)
-  : getApp();
-
-export const firebaseAuth = getAuth(firebaseApp);
-export const firestore = getFirestore(firebaseApp);
-```
-
-Kontrola `getApps().length` brání opakované inicializaci při testech nebo vývojovém obnovování modulů. Ostatní části aplikace importují pouze připravené instance `firebaseAuth` a `firestore`.
-
-## 10. Služba pro anonymní autentizaci
-
-Vygenerujte službu:
-
-```bash
-npx ng generate service services/firebase-auth --type=service
-```
-
-Nahraďte obsah `src/app/services/firebase-auth.service.ts`:
-
-```typescript
-import { Injectable, signal } from '@angular/core';
-import { signInAnonymously } from 'firebase/auth';
-import { firebaseAuth } from '../firebase.client';
-
-@Injectable({
-  providedIn: 'root',
-})
-export class FirebaseAuthService {
-  private readonly userIdState = signal<string | null>(null);
-  private readonly readyState = signal(false);
-  private initializationPromise: Promise<string> | null = null;
-
-  readonly userId = this.userIdState.asReadonly();
-  readonly ready = this.readyState.asReadonly();
-
-  initialize(): Promise<string> {
-    this.initializationPromise ??= this.signIn();
-    return this.initializationPromise;
-  }
-
-  private async signIn(): Promise<string> {
-    try {
-      await firebaseAuth.authStateReady();
-
-      const user = firebaseAuth.currentUser ??
-        (await signInAnonymously(firebaseAuth)).user;
-
-      this.userIdState.set(user.uid);
-      return user.uid;
-    } finally {
-      this.readyState.set(true);
-    }
-  }
-}
-```
-
-`authStateReady()` počká na načtení dříve uložené relace. Pokud účet existuje, služba jej znovu použije. Jinak `signInAnonymously()` vytvoří nový anonymní účet. `initializationPromise` zajišťuje, že souběžné stránky nespustí více přihlášení.
-
-## 11. Vygenerování cloudové služby
-
-Vytvořte druhou službu pro historii:
+## 2. Kostra cloudové služby
 
 ```bash
 npx ng generate service services/firebase-counter --type=service
 ```
 
-Lokální `counter.service.ts` ponechte v projektu. V dalších částech pouze přepojíte stránky na novou `FirebaseCounterService`.
-
-## 12. Implementace FirebaseCounterService
-
-Nahraďte obsah `src/app/services/firebase-counter.service.ts`:
+Do `src/app/services/firebase-counter.service.ts` vložte počáteční kostru:
 
 ```typescript
 import { Injectable, inject, signal } from '@angular/core';
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { firestore } from '../firebase.client';
+import { SavedCounter } from '../models/saved-counter';
+import { FirebaseAuthService } from './firebase-auth.service';
+
+@Injectable({ providedIn: 'root' })
+export class FirebaseCounterService {
+  private readonly auth = inject(FirebaseAuthService);
+  private readonly countersState = signal<SavedCounter[]>([]);
+  private readonly initializedState = signal(false);
+  private readonly errorState = signal('');
+
+  readonly counters = this.countersState.asReadonly();
+  readonly initialized = this.initializedState.asReadonly();
+  readonly errorMessage = this.errorState.asReadonly();
+}
+```
+
+Rozhraní `counters()` a `initialized()` odpovídá lokální službě z CV4. Stránky díky tomu nebudeme celé přepisovat.
+
+### 2.1 Kolekce přihlášeného uživatele
+
+Do třídy přidejte:
+
+```typescript
+private async userCounters() {
+  const uid = await this.auth.initialize();
+  return collection(firestore, 'users', uid, 'counters');
+}
+```
+
+Metoda nejdříve získá UID, teprve potom sestaví odkaz na kolekci. Vytvoření odkazu samo data nenačítá. Návratový typ zde TypeScript odvodí; `async` znamená, že volající použije `await`.
+
+### 2.2 Jednorázové čtení
+
+Přidejte veřejnou metodu:
+
+```typescript
+async load(): Promise<void> {
+  this.errorState.set('');
+
+  try {
+    const counters = await this.userCounters();
+    const snapshot = await getDocs(query(counters, orderBy('createdAt', 'desc')));
+    const items = snapshot.docs.map((item) => item.data() as SavedCounter);
+    this.countersState.set(items);
+  } catch (error) {
+    console.error(error);
+    this.errorState.set('Historii se nepodařilo načíst.');
+  } finally {
+    this.initializedState.set(true);
+  }
+}
+```
+
+Čtení má čtyři kroky: odkaz na kolekci → seřazený dotaz → odpověď serveru → pole pro Angular signal. `finally` ukončí indikátor načítání i při chybě.
+
+`as SavedCounter` je informace pro TypeScript, **ne kontrola dat za běhu**. Pro cvičení předpokládáme dokumenty vytvořené naší aplikací. V produkci bychom doplnili validaci pravidly i při čtení.
+
+**Úkol:** Než budete pokračovat, změňte směr řazení na vzestupný a vysvětlete, co se změní. Pak vraťte `'desc'`.
+
+### 2.3 Vstup pro stránky
+
+Přidejte do třídy metodu, kterou už stránky znají z lokální služby:
+
+```typescript
+async initialize(): Promise<void> {
+  await this.load();
+}
+```
+
+Zatím jde o jednorázové načtení. Později stejný vstup použijeme ke spuštění jednoho posluchače.
+
+## 3. Uložení prvního dokumentu
+
+Do existujícího importu z `firebase/firestore` doplňte `doc` a `setDoc`. Do třídy přidejte:
+
+```typescript
+async add(counter: SavedCounter): Promise<void> {
+  this.errorState.set('');
+
+  try {
+    const counters = await this.userCounters();
+    await setDoc(doc(counters, counter.id), counter);
+    await this.load();
+  } catch (error) {
+    console.error(error);
+    this.errorState.set('Záznam se nepodařilo uložit.');
+  }
+}
+```
+
+`doc()` sestaví odkaz na konkrétní dokument, `setDoc()` do něj zapíše objekt. Po zápisu zatím historii znovu načteme.
+
+**Předpověď:** Co udělá druhé uložení objektu se stejným `id`? Vznikne druhý dokument, nebo se přepíše první? Ověřte to později v Console.
+
+## 4. Přepojení existujících stránek
+
+### První záložka
+
+V `src/app/tab1/tab1.page.ts` nahraďte import lokální služby:
+
+```typescript
+import { FirebaseCounterService } from '../services/firebase-counter.service';
+```
+
+Změňte pouze injekci:
+
+```typescript
+private readonly counterService = inject(FirebaseCounterService);
+```
+
+`onSaved()` už z CV4 volá `await this.counterService.add(counter)`, proto ho ponechte. HTML a `CounterComponent` neměňte.
+
+### Historie
+
+Stejný import a změnu injekce proveďte v `src/app/tab2/tab2.page.ts`; vlastnost zde musí zůstat veřejná pro šablonu:
+
+```typescript
+readonly counterService = inject(FirebaseCounterService);
+```
+
+Ponechte `auth`, protože v HTML dál zobrazuje UID. Odstraňte `authError` a import `signal`, pokud už ho stránka nepoužívá. Celou metodu `ngOnInit()` nahraďte:
+
+```typescript
+async ngOnInit(): Promise<void> {
+  await this.counterService.initialize();
+}
+```
+
+Cloudová služba nyní zajišťuje i potřebné přihlášení a zachytává chyby.
+
+V `tab2.page.html` nahraďte blok identity z CV7 těmito dvěma nezávislými bloky:
+
+```html
+@if (counterService.errorMessage()) {
+  <p class="state-message">{{ counterService.errorMessage() }}</p>
+}
+
+@if (auth.userId(); as uid) {
+  <p class="state-message">Anonymní uživatel: {{ uid }}</p>
+}
+```
+
+Zbytek šablony včetně stavů načítání a prázdné historie ponechte.
+
+**Dočasně odstraňte** z `Tab2Page` metody `remove()` a `clear()` a z HTML obě odpovídající tlačítka (`Odstranit` a `Vymazat vše`). Služba zatím mazat neumí. Tlačítka i metody vrátíte v následujícím kroku. Nyní má být aplikace sestavitelná.
+
+### Kontrolní bod: první cloudová historie
+
+Spusťte `ionic serve`, uložte dva různé záznamy a otevřete Historii. Ve **Firestore Database → Data** najděte své `users/{uid}/counters`. Ověřte pole dokumentu a zachování záznamů po obnovení stránky.
+
+Původní lokální data se nepřenesla. Prázdná cloudová historie při prvním spuštění je v pořádku.
+
+## 5. Mazání doplňte sami
+
+Pro odstranění jednoho dokumentu slouží `deleteDoc(odkazNaDokument)`. Doplňte `deleteDoc` do importu z `firebase/firestore`.
+
+**Samostatně, asi 5 minut:** Napište do služby metodu `async remove(id: string): Promise<void>` podle metody `add()`:
+
+1. vymažte starou chybovou zprávu,
+2. získejte kolekci přes `await this.userCounters()`,
+3. sestavte odkaz `doc(counters, id)` a předejte ho do `deleteDoc()`,
+4. počkejte na odstranění a znovu načtěte seznam,
+5. při chybě nastavte zprávu o neúspěšném odstranění.
+
+<details>
+<summary>Kontrola řešení až po vlastním pokusu</summary>
+
+```typescript
+async remove(id: string): Promise<void> {
+  this.errorState.set('');
+
+  try {
+    const counters = await this.userCounters();
+    await deleteDoc(doc(counters, id));
+    await this.load();
+  } catch (error) {
+    console.error(error);
+    this.errorState.set('Záznam se nepodařilo odstranit.');
+  }
+}
+```
+
+</details>
+
+Do `Tab2Page` vraťte tuto metodu a do položky seznamu v HTML tlačítko:
+
+```typescript
+async remove(id: string): Promise<void> {
+  await this.counterService.remove(id);
+}
+```
+
+```html
+<ion-button slot="end" fill="clear" color="danger" (click)="remove(counter.id)">
+  Odstranit
+</ion-button>
+```
+
+Ověřte odstranění konkrétního dokumentu i v Console. Hromadné mazání `clear()` necháme jako bonus; tlačítko `Vymazat vše` zatím nevracejte.
+
+## 6. Od jednorázového čtení k živým datům
+
+Otevřete dvě běžné karty **stejné adresy ve stejném profilu**, v obou Historii. UID musí být stejné. V první kartě přidejte záznam.
+
+**Pozorujte:** První karta si po zápisu zavolá `load()`. Druhá karta o změně neví, dokud stránku neobnovíte. Co musí být jinak, aby server druhou kartu upozornil sám?
+
+### 6.1 Nahraďte načtení posluchačem
+
+V importu z `firebase/firestore` odstraňte `getDocs` a přidejte `onSnapshot`. Celou metodu `load()` nahraďte soukromou metodou:
+
+```typescript
+private async connect(): Promise<void> {
+  try {
+    const counters = await this.userCounters();
+    const countersQuery = query(counters, orderBy('createdAt', 'desc'));
+
+    onSnapshot(
+      countersQuery,
+      (snapshot) => {
+        const items = snapshot.docs.map((item) => item.data() as SavedCounter);
+        this.countersState.set(items);
+        this.initializedState.set(true);
+      },
+      (error) => {
+        console.error(error);
+        this.errorState.set('Živou historii se nepodařilo načíst.');
+        this.initializedState.set(true);
+      },
+    );
+  } catch (error) {
+    console.error(error);
+    this.errorState.set('Připojení k historii se nezdařilo.');
+    this.initializedState.set(true);
+  }
+}
+```
+
+`onSnapshot()` doručí první stav i další změny. Callback aktualizuje signal a Angular překreslí seznam. `connect()` končí po registraci posluchače; **nečeká na první data**. Proto `initializedState` nastavujeme až v callbacku nebo při chybě.
+
+### 6.2 Spusťte pouze jeden posluchač
+
+Mezi vlastnosti služby přidejte:
+
+```typescript
+private connectionPromise: Promise<void> | null = null;
+```
+
+Dosavadní `initialize()` nahraďte:
+
+```typescript
+initialize(): Promise<void> {
+  if (this.connectionPromise === null) {
+    this.connectionPromise = this.connect();
+  }
+
+  return this.connectionPromise;
+}
+```
+
+Jde o stejný princip jako u přihlašování v CV7. Návrat na záložku nemá založit další posluchač. Tato služba žije po celou dobu aplikace. `onSnapshot()` vrací také funkci pro odpojení; u krátce žijící služby nebo při odhlášení uživatele bychom ji museli zavolat. Odhlášení v tomto cvičení nemáme.
+
+### 6.3 Zápis už nenačítá seznam
+
+Z metod `add()` a `remove()` **odstraňte řádek**:
+
+```typescript
+await this.load();
+```
+
+Jiné řádky těchto metod neměňte. Aktualizaci seznamu nyní zajišťuje posluchač. Nepřidávejte záznam ještě ručně do signalu, jinak by mohl vzniknout dvakrát.
+
+Výsledný import Firestore má obsahovat právě používané funkce:
+
+```typescript
 import {
   collection,
   deleteDoc,
@@ -311,541 +352,84 @@ import {
   orderBy,
   query,
   setDoc,
-  writeBatch,
 } from 'firebase/firestore';
-import type { CollectionReference, DocumentData } from 'firebase/firestore';
-import { firestore } from '../firebase.client';
-import { SavedCounter } from '../models/saved-counter';
-import { FirebaseAuthService } from './firebase-auth.service';
-
-function isSavedCounter(value: unknown): value is SavedCounter {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'id' in value &&
-    typeof value.id === 'string' &&
-    'name' in value &&
-    typeof value.name === 'string' &&
-    'value' in value &&
-    typeof value.value === 'number' &&
-    Number.isInteger(value.value) &&
-    'createdAt' in value &&
-    typeof value.createdAt === 'string'
-  );
-}
-
-@Injectable({
-  providedIn: 'root',
-})
-export class FirebaseCounterService {
-  private readonly auth = inject(FirebaseAuthService);
-  private readonly countersState = signal<SavedCounter[]>([]);
-  private readonly initializedState = signal(false);
-  private readonly errorState = signal('');
-  private initializationPromise: Promise<void> | null = null;
-
-  readonly counters = this.countersState.asReadonly();
-  readonly initialized = this.initializedState.asReadonly();
-  readonly errorMessage = this.errorState.asReadonly();
-  readonly userId = this.auth.userId;
-
-  initialize(): Promise<void> {
-    this.initializationPromise ??= this.connect();
-    return this.initializationPromise;
-  }
-
-  async add(counter: SavedCounter): Promise<void> {
-    await this.initialize();
-
-    try {
-      await setDoc(doc(this.userCounters(), counter.id), counter);
-      this.errorState.set('');
-    } catch (error) {
-      this.reportError('Záznam se nepodařilo uložit.', error);
-    }
-  }
-
-  async remove(id: string): Promise<void> {
-    await this.initialize();
-
-    try {
-      await deleteDoc(doc(this.userCounters(), id));
-      this.errorState.set('');
-    } catch (error) {
-      this.reportError('Záznam se nepodařilo odstranit.', error);
-    }
-  }
-
-  async clear(): Promise<void> {
-    await this.initialize();
-
-    try {
-      const batch = writeBatch(firestore);
-
-      for (const counter of this.countersState()) {
-        batch.delete(doc(this.userCounters(), counter.id));
-      }
-
-      await batch.commit();
-      this.errorState.set('');
-    } catch (error) {
-      this.reportError('Historii se nepodařilo vymazat.', error);
-    }
-  }
-
-  private async connect(): Promise<void> {
-    try {
-      await this.auth.initialize();
-      const countersQuery = query(
-        this.userCounters(),
-        orderBy('createdAt', 'desc'),
-      );
-
-      await new Promise<void>((resolve) => {
-        onSnapshot(
-          countersQuery,
-          (snapshot) => {
-            const counters = snapshot.docs
-              .map((item) => item.data())
-              .filter(isSavedCounter);
-
-            this.countersState.set(counters);
-            this.errorState.set('');
-            this.initializedState.set(true);
-            resolve();
-          },
-          (error) => {
-            this.reportError('Cloudovou historii se nepodařilo načíst.', error);
-            this.initializedState.set(true);
-            resolve();
-          },
-        );
-      });
-    } catch (error) {
-      this.reportError('Přihlášení k Firebase se nezdařilo.', error);
-      this.initializedState.set(true);
-    }
-  }
-
-  private userCounters(): CollectionReference<DocumentData> {
-    const userId = this.auth.userId();
-
-    if (userId === null) {
-      throw new Error('Firebase uživatel není přihlášený.');
-    }
-
-    return collection(firestore, 'users', userId, 'counters');
-  }
-
-  private reportError(message: string, error: unknown): void {
-    console.error(message, error);
-    this.errorState.set(message);
-  }
-}
 ```
 
-### Co služba dělá
+**Kontrolní bod:** Obnovte obě karty, v obou otevřete Historii. Přidejte a odstraňte záznam. Změny se mají projevit v obou kartách bez obnovení. Vysvětlete vlastními slovy, kdo teď mění `countersState`.
 
-| Část | Význam |
-| --- | --- |
-| `auth.initialize()` | získá stabilní anonymní `uid` |
-| `collection(..., uid, ...)` | omezuje dotaz na data aktuálního uživatele |
-| `onSnapshot()` | pošle první stav a potom každou další změnu v reálném čase |
-| `orderBy('createdAt', 'desc')` | řadí ISO časy od nejnovějších |
-| `setDoc()` | uloží záznam pod jeho existujícím UUID |
-| `deleteDoc()` | odstraní jeden dokument |
-| `writeBatch()` | odstraní více dokumentů jedním atomickým požadavkem |
-| `isSavedCounter()` | ověří data přijatá ze vzdálené databáze za běhu |
+## 7. Vlastní data a cizí data
 
-`onSnapshot()` vrací funkci pro odhlášení posluchače. Služba je singleton po celou dobu běhu aplikace, proto posluchač zůstává aktivní. U služby s kratší životností byste jej museli odhlásit při zničení.
+### Dva různí uživatelé
 
-Batch ve Firestore má omezený počet operací. Pro malé cvičné seznamy je jedno volání dostačující; produkční aplikace s velkou kolekcí by mazala po stránkách nebo použila serverovou funkci.
+V soukromém okně otevřete aplikaci a Historii. UID bude jiné a seznam prázdný. Přidejte záznam; v běžném okně se objevit nesmí.
 
-## 13. Přepojení první záložky
+Tím jste ověřili oddělené cesty. Ještě ale potřebujete zjistit, zda server opravdu odmítne cizí přístup.
 
-V `src/app/tab1/tab1.page.ts` změňte import a injektovanou službu. Výsledný soubor:
+### Zkuste zakázaný přístup
+
+V běžném okně si poznamenejte UID ze soukromého okna. V metodě `userCounters()` dočasně nahraďte pouze návratový řádek:
 
 ```typescript
-import { Component, inject } from '@angular/core';
-import { IonContent, IonHeader, IonTitle, IonToolbar } from '@ionic/angular';
-import { CounterComponent } from '../components/counter/counter.component';
-import { SavedCounter } from '../models/saved-counter';
-import { FirebaseCounterService } from '../services/firebase-counter.service';
-
-@Component({
-  selector: 'app-tab1',
-  templateUrl: 'tab1.page.html',
-  styleUrls: ['tab1.page.scss'],
-  imports: [CounterComponent, IonContent, IonHeader, IonTitle, IonToolbar],
-})
-export class Tab1Page {
-  private readonly counterService = inject(FirebaseCounterService);
-
-  async onSaved(counter: SavedCounter): Promise<void> {
-    await this.counterService.add(counter);
-  }
-}
+return collection(firestore, 'users', 'UID_ZE_SOUKROMEHO_OKNA', 'counters');
 ```
 
-HTML první záložky není třeba měnit. `CounterComponent` stále vytváří stejný objekt; neví, zda jej rodič uloží lokálně nebo do cloudu.
-
-## 14. Přepojení záložky Historie
-
-V `src/app/tab2/tab2.page.ts` nahraďte import `CounterService` importem `FirebaseCounterService` a upravte typ injekce:
+Místo zástupného textu vložte skutečné cizí UID. Obnovte běžné okno a otevřete Historii. Očekáváte `permission-denied`, chybovou zprávu a žádná cizí data. Pokud lint hlásí nepoužité `uid`, jde o důsledek dočasné změny; po testu ji ihned vraťte:
 
 ```typescript
-import { Component, inject, OnInit } from '@angular/core';
-import { DatePipe } from '@angular/common';
-import {
-  IonButton,
-  IonContent,
-  IonHeader,
-  IonItem,
-  IonLabel,
-  IonList,
-  IonNote,
-  IonSpinner,
-  IonText,
-  IonTitle,
-  IonToolbar,
-} from '@ionic/angular';
-import { FirebaseCounterService } from '../services/firebase-counter.service';
-
-@Component({
-  selector: 'app-tab2',
-  templateUrl: 'tab2.page.html',
-  styleUrls: ['tab2.page.scss'],
-  imports: [
-    DatePipe,
-    IonButton,
-    IonContent,
-    IonHeader,
-    IonItem,
-    IonLabel,
-    IonList,
-    IonNote,
-    IonSpinner,
-    IonText,
-    IonTitle,
-    IonToolbar,
-  ],
-})
-export class Tab2Page implements OnInit {
-  readonly counterService = inject(FirebaseCounterService);
-
-  async ngOnInit(): Promise<void> {
-    await this.counterService.initialize();
-  }
-
-  async remove(id: string): Promise<void> {
-    await this.counterService.remove(id);
-  }
-
-  async clear(): Promise<void> {
-    await this.counterService.clear();
-  }
-}
+return collection(firestore, 'users', uid, 'counters');
 ```
 
-Do `src/app/tab2/tab2.page.html` vložte hned pod otevírací značku `ion-content` zobrazení chyby a anonymního ID:
+Aplikaci znovu obnovte a ověřte vlastní historii. Pravidla neuvolňujte.
 
-```html
-@if (counterService.errorMessage()) {
-  <ion-text color="danger">
-    <p class="state-message">{{ counterService.errorMessage() }}</p>
-  </ion-text>
-}
+**Otázka:** Který z pokusů prokázal bezpečnost pravidel a který pouze správnou cestu v klientském kódu?
 
-@if (counterService.userId(); as userId) {
-  <ion-note class="user-id">Anonymní uživatel: {{ userId }}</ion-note>
-}
-```
-
-Zbytek šablony historie z CV4 ponechte. Stavy `initialized()` a `counters()` mají stejné rozhraní jako původní služba.
-
-Do `src/app/tab2/tab2.page.scss` doplňte:
-
-```scss
-.user-id {
-  display: block;
-  max-width: 40rem;
-  margin: 1rem auto;
-  overflow-wrap: anywhere;
-  font-family: monospace;
-  text-align: center;
-}
-```
-
-UID zobrazujeme pro výuku a ověřování izolace. V běžné aplikaci by technický identifikátor uživatele nemusel být součástí hlavního UI.
-
-## 15. První spuštění a kontrola Console
-
-Spusťte:
-
-```bash
-ionic serve
-```
-
-Na záložce Historie počkejte na zobrazení anonymního UID. Potom:
-
-1. vytvořte tři záznamy,
-2. ověřte jejich pořadí od nejnovějšího,
-3. obnovte stránku,
-4. ověřte, že UID i záznamy zůstaly stejné,
-5. odstraňte jeden záznam,
-6. zkontrolujte, že zmizel bez ručního obnovení.
-
-Ve Firebase Console otevřete:
-
-- **Authentication → Users** a najděte anonymní účet se stejným UID,
-- **Firestore Database → Data** a projděte cestu `users/{uid}/counters`,
-- jeden dokument a jeho pole `id`, `name`, `value`, `createdAt`.
-
-Dokumenty v Console ručně neupravujte během běžného scénáře. Pokud změnu provedete, otevřená aplikace ji díky `onSnapshot()` obdrží v reálném čase.
-
-## 16. Ověření synchronizace v reálném čase
-
-Otevřete CounterApp ve dvou běžných kartách stejného profilu prohlížeče.
-
-1. V obou kartách otevřete Historii.
-2. Ověřte, že zobrazují stejné UID.
-3. V první kartě přidejte záznam.
-4. Záznam se má bez obnovení zobrazit také ve druhé kartě.
-5. Ve druhé kartě záznam odstraňte.
-6. Odstranění se má projevit v první kartě.
-
-Obě karty sdílejí stejnou uloženou relaci Firebase Auth. `onSnapshot()` udržuje posluchač nad dotazem a aktualizuje Angular signal při každém novém snapshotu.
-
-## 17. Ověření oddělení uživatelů
-
-Otevřete aplikaci v anonymním nebo soukromém okně prohlížeče.
-
-1. Historie má být prázdná.
-2. Zobrazené UID se musí lišit od běžného okna.
-3. Vytvořte jeden záznam v anonymním okně.
-4. Tento záznam se nesmí objevit v běžném okně.
-5. Ve Firebase Console najděte dvě oddělené cesty pod dvěma UID.
-
-Tím ověřujete kombinaci tří opatření:
-
-- klient zapisuje do cesty obsahující aktuální UID,
-- dotaz načítá pouze tuto cestu,
-- bezpečnostní pravidla odmítnou přístup k cizímu UID.
-
-Pouhé filtrování v Angularu by nebylo zabezpečení. Nedůvěryhodný klient lze změnit; rozhodující kontrola musí probíhat na serveru ve Firestore Rules.
-
-## 18. Negativní test bezpečnostních pravidel
-
-Dočasně v `firebase-counter.service.ts` změňte pouze pro tento test metodu `userCounters()` tak, aby místo vlastního UID použila UID z druhého okna:
-
-```typescript
-return collection(firestore, 'users', 'CIZI_UID', 'counters');
-```
-
-Po obnovení aplikace musí Firestore požadavek odmítnout chybou `permission-denied` a UI zobrazit chybu načtení. V konzoli nesmí být vypsána cizí data.
-
-Ihned potom vraťte původní bezpečnou implementaci:
-
-```typescript
-return collection(firestore, 'users', userId, 'counters');
-```
-
-Před commitem zkontrolujte `git diff`, aby v kódu nezůstalo cizí UID ani testovací změna.
-
-## 19. Rozdíl mezi lokální a cloudovou službou
-
-| Vlastnost | Preferences | Cloud Firestore |
-| --- | --- | --- |
-| Umístění dat | konkrétní prohlížeč nebo instalace | vzdálený Firebase projekt |
-| Přihlášení | není potřeba | anonymní Firebase účet |
-| Reálný čas | pouze vlastní signal | `onSnapshot()` mezi klienty stejného účtu |
-| Bezpečnost | izolace úložiště zařízení | Authentication + Security Rules |
-| Provoz bez sítě | lokální data ihned dostupná | SDK může ukázat lokální změnu, potvrzení zápisu ale čeká na síť |
-| Náklady a kvóty | úložiště zařízení | kvóty čtení, zápisů a uložených dat |
-| Odinstalování | data se smažou | cloudová data zůstanou, ale nové anonymní UID k nim nemá přístup |
-
-Cloud není automaticky lepší pro každý typ dat. Preferences jsou vhodné pro malé lokální nastavení. Firestore dává smysl pro synchronizaci, více klientů a data spravovaná serverem.
-
-## 20. Spuštění na Androidu
-
-Vytvořte aktuální webový build a synchronizujte Android projekt:
+## 8. Dokončení a odevzdání
 
 ```bash
 npm run lint
 ionic build
-npx cap sync android
-npx cap run android
-```
-
-V emulátoru proveďte:
-
-1. otevřete Historii a počkejte na anonymní UID,
-2. vytvořte alespoň dva záznamy,
-3. ukončete aplikaci a znovu ji spusťte,
-4. ověřte stejné UID a zachovaná data,
-5. zapněte Airplane mode a zkuste přidat další záznam,
-6. ověřte, že aplikace nespadne; lokální posluchač může změnu zobrazit, ale Promise zápisu čeká na potvrzení serveru,
-7. síť obnovte, počkejte na synchronizaci a aplikaci spusťte znovu.
-
-Android WebView má vlastní úložiště a vytvoří jiné anonymní UID než desktopový prohlížeč. Proto neuvidí jeho data. Přenos identity mezi zařízeními vyžaduje skutečný přihlašovací mechanismus, kterému se budete věnovat v CV9.
-
-Firebase používá veřejné HTTPS adresy. Není potřeba měnit `localhost`, Android Network Security Config ani povolovat nezabezpečené HTTP.
-
-Firestore používá takzvanou kompenzaci latence: lokální snapshot může obsahovat dosud nepotvrzený zápis. `setDoc()` se dokončí až po potvrzení backendem, takže při vypnuté síti může jeho Promise zůstat čekat. Produkční UI by stav neodeslaných změn rozlišovalo pomocí metadat snapshotu `hasPendingWrites`.
-
-## 21. Kontrola síťových požadavků
-
-Při běhu v prohlížeči otevřete Chrome DevTools:
-
-1. Na kartě **Network** filtrujte `firestore` nebo `googleapis`.
-2. Vytvořte a odstraňte záznam.
-3. Sledujte aktivní spojení a požadavky Firebase SDK.
-4. Na kartě **Console** nesmí být při normálním použití `permission-denied` ani chyba konfigurace.
-
-Ve Firebase Console na kartě **Usage** lze sledovat počet čtení, zápisů a odstranění. Posluchač snapshotů spotřebovává čtení při prvním načtení i při změnách výsledků. Nevytvářejte zbytečně nové posluchače při každém vstupu na záložku.
-
-## 22. Produkční kontrola a Git
-
-Spusťte:
-
-```bash
-npm run lint
-ionic build
-npx cap sync android
-npx cap doctor android
-git status
 git diff --check
+git diff
 ```
 
-Pokud máte nastavený Prettier, spusťte také:
+- [ ] Přidání a odstranění funguje i po obnovení stránky.
+- [ ] Dvě karty se stejným UID sdílejí změny bez obnovení.
+- [ ] Soukromé okno má jiné UID a vlastní data.
+- [ ] Přístup k cizímu UID server odmítl; testovací změna je vrácená.
+- [ ] V metodách nezůstalo volání odstraněného `load()` ani import `getDocs`.
+- [ ] Lokální `CounterService` zůstal v projektu pro porovnání.
+- [ ] Soubor `firestore.rules` odpovídá publikovaným pravidlům.
+- [ ] Lint a sestavení prošly.
 
 ```bash
-npm run format
-npm run format:check
+git add src firestore.rules
+git commit -m "CV8: cloudova historie a zive zmeny"
 ```
 
-Před commitem ověřte:
+Před odchodem vysvětlete spolužákovi bez čtení kódu cestu: **kliknutí na Uložit → dokument ve Firestore → callback → signal → seznam**.
 
-- oba soubory `environment` obsahují konfiguraci vašeho Firebase projektu,
-- v repozitáři není servisní účet, soukromý klíč ani heslo,
-- Firestore Rules nejsou otevřené pomocí `if true`,
-- negativní test s cizím UID je vrácený,
-- aplikace používá cestu `users/{uid}/counters`,
-- původní lokální `CounterService` zůstal zachovaný,
-- `package.json` a `package-lock.json` obsahují Firebase SDK 12.19.0,
-- `capacitor.config.ts` neobsahuje `server.url`.
+## Bonusy podle zbývajícího času
 
-Uložte práci:
+Povinnou část máte dokončenou. Vyberte si jeden úkol:
 
-```bash
-git add package.json package-lock.json src
-git commit -m "Přidána cloudová historie pomocí Firebase"
-git status
-```
+1. **Vymazání celé historie:** napište `clear()` pomocí `writeBatch()`, `batch.delete()` pro každý aktuální záznam a `batch.commit()`. Vraťte tlačítko i metodu stránky. Pracujte jen s malou cvičnou historií.
+2. **Validace dat:** rozšiřte pravidlo zápisu o kontrolu polí a typů; při mazání není `request.resource.data` dostupné, proto oddělte `create, update` od `delete`. Zkuste zapsat chybný typ hodnoty.
+3. **Android:** spusťte `ionic build`, `npx cap sync android` a `npx cap run android`. Uložte záznam a aplikaci znovu spusťte. WebView má vlastní anonymní účet, a proto jiná data než desktop.
+4. **Řazení a omezení:** pomocí `limit(10)` zobrazte deset nejnovějších záznamů. Co nyní znamená počet položek v UI?
+5. **Síť:** po načtení historie vypněte síť a zkuste zápis. Posluchač může ukázat lokální změnu před potvrzením serveru; `setDoc()` může zůstat čekat. Po obnovení sítě zkontrolujte dokument v Console. Nezaměňujte lokální zobrazení za potvrzený zápis.
 
-Pravidla vytvořená pouze ve Firebase Console nejsou součástí tohoto commitu. V bonusovém úkolu je můžete přesunout do `firestore.rules` a spravovat verzovaně pomocí Firebase CLI.
+## Když se nedaří
 
-## 23. Kontrolní seznam CV8
-
-- [ ] Firebase projekt patří studentovi a obsahuje registrovanou webovou aplikaci.
-- [ ] Je zapnutý Anonymous provider ve Firebase Authentication.
-- [ ] Cloud Firestore je vytvořený v Production mode.
-- [ ] Bezpečnostní pravidla oddělují data podle `request.auth.uid`.
-- [ ] Projekt používá modulární Firebase SDK 12.19.0.
-- [ ] Konfigurace je v obou souborech prostředí.
-- [ ] V repozitáři není soukromý klíč ani servisní účet.
-- [ ] Aplikace používá `signInAnonymously()` a zobrazuje UID.
-- [ ] Historie se načítá pomocí jednoho posluchače `onSnapshot()`.
-- [ ] Přidání, odstranění a vymazání historie funguje.
-- [ ] Dvě karty se stejným UID se synchronizují v reálném čase.
-- [ ] Dva různí anonymní uživatelé navzájem nevidí svá data.
-- [ ] Negativní test cizího UID skončil chybou `permission-denied`.
-- [ ] Aplikace funguje v prohlížeči i na Androidu.
-- [ ] Chyba sítě ani Firebase nezpůsobí pád aplikace.
-- [ ] `npm run lint` a `ionic build` proběhnou bez chyby.
-- [ ] Projekt je uložený v Git commitu a pracovní strom je čistý.
-
-## 24. Bonusové úkoly
-
-Po dokončení povinné části můžete:
-
-1. přidat přepínač mezi lokálním `CounterService` a `FirebaseCounterService`,
-2. zobrazit stav online/offline pomocí Capacitor Network,
-3. zapnout a otestovat lokální Firestore cache pro web,
-4. omezit dotaz pomocí `limit()` na posledních 50 záznamů,
-5. přidat editaci názvu dokumentu pomocí `updateDoc()`,
-6. nahradit ISO řetězec serverovým časem `serverTimestamp()`,
-7. otestovat pravidla pomocí Firebase Emulator Suite,
-8. uložit pravidla do souboru `firestore.rules` a nasazovat je Firebase CLI,
-9. zapnout Firebase App Check a ověřit požadavky aplikace,
-10. propojit anonymní účet s trvalým účtem bez ztráty dat.
-
-Nezapínejte placený tarif ani službu vyžadující fakturační účet pouze kvůli bonusu. Sledujte kvóty vlastního projektu.
-
-## 25. Nejčastější problémy
-
-### `auth/configuration-not-found`
-
-Ve Firebase Console není zapnutý Anonymous provider nebo aplikace používá konfiguraci jiného projektu. Zkontrolujte **Authentication → Sign-in method** a `projectId` v prostředí.
-
-### `Missing or insufficient permissions`
-
-Firestore Rules požadavek odmítly. Ověřte:
-
-- že jste pravidla publikovali,
-- že `request.auth` není `null`,
-- že cesta obsahuje stejné UID jako přihlášený uživatel,
-- že dokument obsahuje pouze povolená pole správných typů,
-- že pole `id` odpovídá ID dokumentu.
-
-Neřešte chybu otevřením pravidel pomocí `allow read, write: if true`.
-
-### `Firebase App named '[DEFAULT]' already exists`
-
-Firebase byl inicializován vícekrát. Použijte připravenou kontrolu `getApps().length === 0 ? initializeApp(...) : getApp()` a inicializaci ponechte pouze v `firebase.client.ts`.
-
-### Historie se načítá bez konce
-
-Zkontrolujte Network a Console. `onSnapshot()` musí v úspěšné i chybové callback větvi nastavit `initializedState` a dokončit Promise. Častou příčinou je nepublikované pravidlo nebo chybný `projectId`.
-
-### Po obnovení vzniklo jiné UID
-
-Firebase Auth musí mít povolené úložiště webu. Zkontrolujte, zda prohlížeč neblokuje webová data, nepoužíváte pokaždé nové anonymní okno a ručně nemažete úložiště webu. Android ztratí UID po vymazání dat aplikace nebo odinstalování.
-
-### Desktop a Android zobrazují jiná data
-
-To je u anonymního přihlášení očekávané: každá instalace má vlastní účet a UID. Sdílení dat mezi zařízeními vyžaduje přihlášení stejného uživatele trvalou metodou.
-
-### Změna v druhé kartě se neprojeví
-
-Ověřte, že obě karty zobrazují stejné UID a služba používá `onSnapshot()`, nikoliv jednorázové `getDocs()`. Anonymní okno má jiné úložiště a jiný účet.
-
-### `The query requires an index`
-
-Dotaz na jednu kolekci s jediným `orderBy('createdAt')` běžně používá automatický index. Pokud jste přidali další filtry, Firestore může vyžadovat složený index. Použijte odkaz z chybové zprávy pouze tehdy, když rozumíte změněnému dotazu.
-
-### Aplikace funguje přes `ionic serve`, ale ne na Androidu
-
-Spusťte:
-
-```bash
-ionic build
-npx cap sync android
-```
-
-Potom zkontrolujte Logcat a WebView DevTools. Ověřte, že produkční `environment.prod.ts` obsahuje stejnou Firebase konfiguraci jako vývojové prostředí.
-
-### Záznam se po kliknutí objeví dvakrát
-
-Nepřidávejte záznam ručně do signalu po `setDoc()`. Jediným zdrojem cloudového stavu je `onSnapshot()`, který po úspěšném zápisu pošle aktualizovaný seznam.
+- **`permission-denied`:** porovnejte UID, cestu kolekce a publikovaná pravidla. Zkontrolujte, zda nezůstalo cizí testovací UID.
+- **Historie je prázdná:** cloudová historie nepřebírá staré Preferences. Zkontrolujte správný Firebase projekt a účet.
+- **Druhá karta se neaktualizuje:** ověřte shodnou adresu a UID, nahrazení `load()` posluchačem a otevření Historie v obou kartách.
+- **Nelze najít `load`, `clear` nebo `remove`:** některý z mezikroků není dokončen. `load()` ve finální službě není; `clear()` a jeho tlačítko patří do bonusu.
+- **Načítání nekončí:** zkontrolujte Console a oba callbacky posluchače. Úspěch i chyba musí nastavit `initializedState`.
+- **Záznam se objeví dvakrát:** signal historie má měnit pouze callback `onSnapshot()`.
 
 ## Oficiální dokumentace
 
-- [Firebase – přidání SDK do webové aplikace](https://firebase.google.com/docs/web/setup)
-- [Firebase Authentication – anonymní přihlášení](https://firebase.google.com/docs/auth/web/anonymous-auth)
-- [Cloud Firestore – přidávání dat](https://firebase.google.com/docs/firestore/manage-data/add-data)
-- [Cloud Firestore – posluchače v reálném čase](https://firebase.google.com/docs/firestore/query-data/listen)
-- [Cloud Firestore – řazení a omezení dotazu](https://firebase.google.com/docs/firestore/query-data/order-limit-data)
-- [Cloud Firestore Security Rules – podmínky](https://firebase.google.com/docs/firestore/security/rules-conditions)
-- [Cloud Firestore Security Rules – bezpečné dotazy](https://firebase.google.com/docs/firestore/security/rules-query)
-- [Firebase – kvóty Firestore](https://firebase.google.com/docs/firestore/quotas)
+- [Zápis dokumentů](https://firebase.google.com/docs/firestore/manage-data/add-data)
+- [Jednorázové čtení](https://firebase.google.com/docs/firestore/query-data/get-data)
+- [Poslech změn](https://firebase.google.com/docs/firestore/query-data/listen)
+- [Podmínky bezpečnostních pravidel](https://firebase.google.com/docs/firestore/security/rules-conditions)
